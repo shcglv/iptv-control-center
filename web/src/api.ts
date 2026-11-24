@@ -227,6 +227,67 @@ export const clearProfileChannel = (id: number, key: string): Promise<void> =>
 export const listChannelSources = (key: string): Promise<ChannelSource[]> =>
   request<ChannelSource[]>(`/api/v1/channels/${key}/sources`);
 
+export interface Candidate {
+  id: number;
+  adapter: string;
+  kind: string;
+  url_masked: string;
+  host: string;
+  title: string | null;
+  author: string | null;
+  published_at: string | null;
+  confidence: number;
+  has_credentials: boolean;
+  status: string;
+  created_at: string;
+}
+
+export interface CandidatePage {
+  total: number;
+  items: Candidate[];
+}
+
+export interface DiscoveryStatus {
+  new: number;
+  accepted: number;
+  rejected: number;
+  adapters: string[];
+}
+
+export interface DiscoveryRunResult {
+  adapter: string;
+  items: number;
+  created: number;
+  updated: number;
+}
+
+export const runDiscovery = (
+  adapter: "rss" | "html",
+  url: string,
+  limit = 50,
+): Promise<DiscoveryRunResult> =>
+  request<DiscoveryRunResult>("/api/v1/discovery/run", {
+    method: "POST",
+    body: JSON.stringify({ adapter, url, limit }),
+  });
+
+export const listCandidates = (status?: string): Promise<CandidatePage> =>
+  request<CandidatePage>(
+    `/api/v1/discovery/candidates${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+  );
+
+export const acceptCandidate = (id: number, name?: string): Promise<SourceOut> =>
+  request<SourceOut>(`/api/v1/discovery/candidates/${id}/accept`, {
+    method: "POST",
+    body: JSON.stringify({ name: name ?? null }),
+  });
+
+export const rejectCandidate = (id: number): Promise<void> =>
+  request<void>(`/api/v1/discovery/candidates/${id}/reject`, { method: "POST" });
+
+export const discoveryStatus = (): Promise<DiscoveryStatus> =>
+  request<DiscoveryStatus>("/api/v1/discovery/status");
+
 export const schedulerStatus = (): Promise<SchedulerStatus> =>
   request<SchedulerStatus>("/api/v1/scheduler/status");
 

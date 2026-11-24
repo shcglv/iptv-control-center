@@ -98,7 +98,7 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] RSS/Atom and HTML adapters with pagination and provenance
 - [x] Candidate store with dedupe, encrypted URLs, masked display, credential flag
 - [x] Review API: run, list, accept (creates a Source), reject, status
-- [ ] Discovery UI tab (review queue is API-only for now)
+- [x] Discovery UI: run form, filter chips, masked candidate table, accept/reject
 - [ ] iptv-org catalog seeding + DMCA blocklist
 - [ ] Authenticated forum sessions (cookie import)
 - [ ] Scheduled re-crawls and change tracking of already-seen posts

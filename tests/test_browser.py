@@ -15,10 +15,12 @@ import re
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -98,6 +100,8 @@ def live_server(tmp_path: Path) -> Iterator[tuple[str, str]]:
         "IPTV_ENCRYPTION_KEY": base64.b64encode(b"b" * 32).decode(),
         "IPTV_PUBLIC_BASE_URL": f"http://127.0.0.1:{port}",
         "IPTV_SCHEDULER_ENABLED": "false",
+        "IPTV_TELEGRAM_ENABLED": "false",
+        "IPTV_ALLOW_PRIVATE_NETWORK_TARGETS": "1",
     }
     subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
@@ -232,4 +236,82 @@ def test_profile_editor_hides_a_channel(live_server: tuple[str, str], tmp_path: 
 
         # The profile list reports one fewer visible channel.
         page.get_by_role("row", name="Kids").get_by_text("2 / 3").wait_for(timeout=10_000)
+        browser.close()
+
+
+FEED = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>Forum</title>
+<item><title>UK playlist</title><link>http://forum.test/t/1</link>
+<description>http://provider.test/uk.m3u8</description></item>
+<item><title>Secret panel</title><link>http://forum.test/t/2</link>
+<description>http://panel.test/get.php?username=bob&amp;password=secret</description></item>
+</channel></rss>
+"""
+
+
+class _FeedHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:  # noqa: N802
+        body = FEED.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/rss+xml")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *_args: object) -> None:
+        return
+
+
+@pytest.fixture
+def feed_server() -> Iterator[str]:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _FeedHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}/feed.xml"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.mark.browser
+def test_discovery_reviews_a_candidate(
+    live_server: tuple[str, str], feed_server: str, tmp_path: Path
+) -> None:
+    """Run discovery from the panel, check masking, accept a candidate and see the source."""
+    base, secret = live_server
+
+    with playwright_api.sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(base, wait_until="domcontentloaded")
+        page.wait_for_selector("#email", timeout=15_000)
+        page.fill("#email", "admin@local")
+        page.fill("#password", PASSWORD)
+        page.fill("#totp", pyotp.TOTP(secret).now())
+        page.click("button[type=submit]")
+        page.wait_for_selector("text=Требует внимания", timeout=20_000)
+
+        page.get_by_role("button", name="Обнаружение").click()
+        page.wait_for_selector("text=Поиск источников", timeout=10_000)
+
+        page.fill("#discovery-url", feed_server)
+        page.get_by_role("button", name="Найти").click()
+        page.wait_for_selector("text=Найдено 2", timeout=20_000)
+
+        table = page.locator("table")
+        table.get_by_text("provider.test").wait_for(timeout=10_000)
+        content = page.content()
+        assert "password=secret" not in content
+        assert "bob" not in content
+        page.screenshot(path=str(tmp_path / "discovery.png"), full_page=True)
+
+        page.get_by_role("button", name="Принять").first.click()
+        page.wait_for_selector("text=Источник создан", timeout=15_000)
+
+        page.get_by_role("button", name="Источники").click()
+        page.wait_for_selector("text=Новый источник", timeout=10_000)
+        assert page.locator("table").get_by_text("UK playlist").count() >= 1 or page.locator(
+            "table"
+        ).get_by_text("Secret panel").count() >= 1
+
         browser.close()

@@ -192,13 +192,14 @@ no node runtime in production.
 | Bundle size | 244 KB JS (75 KB gzip) + 6.9 KB CSS (2.1 KB gzip) |
 
 Screens: Overview (stats, attention, worst streams), Channels (search + pagination), Quality
-(probe scores and a manual check), Playlists (profiles, per-channel visibility, ordering, source
-pins), Sources (create + import playlist), Devices (create, reveal token once, rotate). Login is
-password + TOTP.
+(probe scores and a manual check), Discovery (run an adapter, review candidates, accept or reject),
+Playlists (profiles, per-channel visibility, ordering, source pins), Sources (create + import
+playlist), Devices (create, reveal token once, rotate). Login is password + TOTP.
 
 The UI is verified in a real browser: `tests/test_browser.py` starts the server as a subprocess,
-creates an admin with a known TOTP secret, logs in through Chromium, walks every section and edits a
-profile. It is opt-in because it needs a Chromium download:
+creates an admin with a known TOTP secret, logs in through Chromium, walks every section, edits a
+profile and runs a discovery review against a local feed. It is opt-in because it needs a Chromium
+download:
 
 ```powershell
 $env:IPTV_BROWSER_TESTS = "1"

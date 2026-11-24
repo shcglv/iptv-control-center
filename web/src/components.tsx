@@ -99,11 +99,11 @@ export function Loading({ label = "Загрузка…" }: { label?: string }) {
 
 export function formatEpoch(seconds: number | null): string {
   if (!seconds) return "—";
-  return new Date(seconds * 1000).toLocaleString();
+  return new Date(seconds * 1000).toLocaleString("ru-RU");
 }
 
 export function formatIso(value: string | null): string {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("ru-RU");
 }
