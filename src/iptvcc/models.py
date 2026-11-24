@@ -369,6 +369,25 @@ class StreamQuality(Base):
     bandwidth_bps: Mapped[int | None] = mapped_column(Integer)
 
 
+class SchedulerState(Base):
+    """Single-row coordination record: ownership lease plus watchdog timestamps.
+
+    A row works as an advisory lock on both SQLite and PostgreSQL: ``acquire`` is a conditional
+    UPDATE, so two processes cannot both win.
+    """
+
+    __tablename__ = "scheduler_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    owner: Mapped[str | None] = mapped_column(String(120))
+    locked_until: Mapped[int | None] = mapped_column(Integer)
+    last_tick_epoch: Mapped[int | None] = mapped_column(Integer)
+    last_round_epoch: Mapped[int | None] = mapped_column(Integer)
+    rounds: Mapped[int] = mapped_column(Integer, default=0)
+    probed_total: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text)
+
+
 # --- admin identity ----------------------------------------------------------------------------
 
 

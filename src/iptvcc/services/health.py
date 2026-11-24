@@ -14,6 +14,7 @@ import asyncio
 import re
 import socket
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
@@ -158,21 +159,31 @@ async def probe_stream(stream: Stream, *, timeout: float = PROBE_TIMEOUT) -> Pro
     return result
 
 
-async def run_probe_round(session: AsyncSession, *, limit: int = 50) -> dict[str, int]:
-    """Probe the least recently checked live streams and refresh their aggregates."""
-    rows = (
-        await session.execute(
-            select(Stream, StreamQuality)
-            .outerjoin(StreamQuality, StreamQuality.stream_id == Stream.id)
-            .where(Stream.is_stale.is_(False))
-            .order_by(
-                StreamQuality.last_checked_epoch.is_(None).desc(),
-                StreamQuality.last_checked_epoch,
-                Stream.id,
-            )
-            .limit(limit)
-        )
-    ).all()
+async def run_probe_round(
+    session: AsyncSession, *, limit: int = 50, stream_ids: Sequence[int] | None = None
+) -> dict[str, int]:
+    """Probe live streams and refresh their aggregates.
+
+    With ``stream_ids`` the round probes exactly those streams (used by the scheduler, which has
+    already applied the tier intervals). Without it, the least recently checked streams are taken.
+    """
+    statement = (
+        select(Stream, StreamQuality)
+        .outerjoin(StreamQuality, StreamQuality.stream_id == Stream.id)
+        .where(Stream.is_stale.is_(False))
+    )
+    if stream_ids is not None:
+        if not stream_ids:
+            return {"probed": 0, "ok": 0, "failed": 0}
+        statement = statement.where(Stream.id.in_(list(stream_ids)))
+    else:
+        statement = statement.order_by(
+            StreamQuality.last_checked_epoch.is_(None).desc(),
+            StreamQuality.last_checked_epoch,
+            Stream.id,
+        ).limit(limit)
+
+    rows = (await session.execute(statement)).all()
 
     if not rows:
         return {"probed": 0, "ok": 0, "failed": 0}

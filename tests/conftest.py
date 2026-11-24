@@ -70,6 +70,8 @@ def _bind_session(factory: async_sessionmaker[AsyncSession]) -> None:
                 raise
 
     app.dependency_overrides[get_session] = override_session
+    # The scheduler tick endpoint resolves its factory from app.state so tests can redirect it.
+    app.state.session_factory = factory
 
 
 @pytest_asyncio.fixture

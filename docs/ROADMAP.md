@@ -84,7 +84,9 @@ Drag & drop editor, impact panel, M3U/EPG preview.
 - [x] Anti-flapping: +10 margin and 15-minute dwell, persisted per channel
 - [x] Resolver and playlist renderer use the ranking
 - [x] Admin API: run a round, list stream health, inspect channel candidates
-- [ ] T0–T4 scheduling with a provider connection-slot budget and watchdog
+- [x] Autonomous scheduling: lease in `scheduler_state`, hot/cold intervals, watchdog
+- [ ] Profile-based T0–T4 tiers (needs per-profile channel visibility)
+- [ ] Provider connection-slot budget per source
 - [ ] Active mode (ffprobe) behind an explicit toggle
 - [ ] Quality Monitor UI and notifications
 

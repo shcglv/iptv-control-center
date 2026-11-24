@@ -6,6 +6,7 @@ import logging
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Literal
@@ -29,7 +30,7 @@ from .auth import (
     set_session_cookie,
 )
 from .config import get_settings
-from .db import create_schema, dispose_engine, get_session
+from .db import create_schema, dispose_engine, get_session, get_session_factory
 from .models import (
     AdminUser,
     Assignment,
@@ -59,6 +60,7 @@ from .services.epg import (
 )
 from .services.health import run_probe_round
 from .services.importing import ImportStats, import_playlist
+from .services.scheduler import ProbeScheduler, scheduler_status
 from .services.selector import rank_candidates
 
 logger = logging.getLogger(__name__)
@@ -72,8 +74,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if not settings.is_production:
         # Production schema changes go through Alembic; see docs/ROADMAP.md.
         await create_schema()
-    yield
-    await dispose_engine()
+
+    scheduler: ProbeScheduler | None = None
+    if settings.scheduler_enabled:
+        factory = get_session_factory()
+        app.state.session_factory = factory
+        scheduler = ProbeScheduler(factory)
+        scheduler.start()
+        app.state.scheduler = scheduler
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            await scheduler.stop()
+        await dispose_engine()
 
 
 app = FastAPI(
@@ -675,6 +689,45 @@ async def channel_health(public_key: str, session: SessionDep, _: AdminDep) -> C
             )
             for candidate in candidates
         ],
+    )
+
+
+class SchedulerStatusOut(BaseModel):
+    running: bool
+    healthy: bool
+    owner: str | None
+    last_tick_epoch: int | None
+    seconds_since_tick: int | None = None
+    stale_after_seconds: int
+    rounds: int
+    probed_total: int
+    last_error: str | None
+
+
+class SchedulerTickOut(BaseModel):
+    probed: int
+    ok: int
+    failed: int
+    skipped: bool
+
+
+@app.get("/api/v1/scheduler/status", response_model=SchedulerStatusOut, tags=["health"])
+async def get_scheduler_status(session: SessionDep, _: AdminDep) -> SchedulerStatusOut:
+    status = await scheduler_status(session)
+    return SchedulerStatusOut(**asdict(status))
+
+
+@app.post("/api/v1/scheduler/tick", response_model=SchedulerTickOut, tags=["health"])
+async def run_scheduler_tick(request: Request, _: AdminDep) -> SchedulerTickOut:
+    """Run one round immediately. Skipped when the background loop holds the lease."""
+    factory = getattr(request.app.state, "session_factory", None) or get_session_factory()
+    scheduler = ProbeScheduler(factory)
+    stats = await scheduler.tick()
+    return SchedulerTickOut(
+        probed=int(stats["probed"]),
+        ok=int(stats["ok"]),
+        failed=int(stats["failed"]),
+        skipped=bool(stats["skipped"]),
     )
 
 

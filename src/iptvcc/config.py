@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     # Rendered playlists/guides and other generated files.
     artifacts_dir: str = "./data/artifacts"
 
+    # Probe scheduler. Disable in tests and when probes must not run (e.g. provider slot limits).
+    scheduler_enabled: bool = True
+    scheduler_tick_seconds: int = 60
+    scheduler_batch_size: int = 25
+    scheduler_lock_ttl_seconds: int = 180
+    # Channels served in the last 24 h are "hot": checked often. Everything else: hourly.
+    scheduler_hot_interval_seconds: int = 300
+    scheduler_cold_interval_seconds: int = 3600
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() in {"production", "prod"}
