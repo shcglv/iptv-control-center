@@ -59,8 +59,15 @@ def validate_url(url: str) -> None:
 
 
 async def resolve_and_check(url: str) -> None:
-    """Resolve the host and refuse if any resolved address is non-global."""
+    """Resolve the host and refuse if any resolved address is non-global.
+
+    ``IPTV_ALLOW_PRIVATE_NETWORK_TARGETS`` relaxes the address check for LAN sources; metadata
+    hostnames stay forbidden either way.
+    """
     validate_url(url)
+    from .config import get_settings
+
+    allow_private = get_settings().allow_private_network_targets
     host = urlsplit(url).hostname or ""
     loop = asyncio.get_running_loop()
     try:
@@ -71,7 +78,7 @@ async def resolve_and_check(url: str) -> None:
         raise UnsafeUrlError("host did not resolve")
     for info in infos:
         address = str(info[4][0])
-        if _is_blocked_ip(address):
+        if _is_blocked_ip(address) and not allow_private:
             raise UnsafeUrlError(f"host resolves to a non-global address: {address}")
 
 
@@ -83,6 +90,7 @@ async def fetch_text(
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(timeout),
         follow_redirects=False,
+        trust_env=False,  # explicit proxy only; ambient HTTP_PROXY is not part of the contract
         headers={"User-Agent": "iptv-control-center/0.1 (+self-hosted)"},
     ) as client:
         current = url

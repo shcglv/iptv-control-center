@@ -485,3 +485,35 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error: Mapped[str | None] = mapped_column(Text)
+
+
+# --- discovery ---------------------------------------------------------------------------------
+
+
+class DiscoveryCandidate(Base):
+    """A link found in a forum or feed, awaiting review.
+
+    The URL may embed provider credentials, so it is stored encrypted and only a masked form is
+    ever rendered or returned by the API.
+    """
+
+    __tablename__ = "discovery_candidate"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    adapter: Mapped[str] = mapped_column(String(32), default="manual")
+    kind: Mapped[str] = mapped_column(String(16), default="m3u")
+    url_enc: Mapped[str] = mapped_column(Text)
+    url_masked: Mapped[str] = mapped_column(String(300))
+    host: Mapped[str] = mapped_column(String(255), index=True)
+    title: Mapped[str | None] = mapped_column(String(300))
+    author: Mapped[str | None] = mapped_column(String(120))
+    published_at: Mapped[str | None] = mapped_column(String(64))
+    snippet: Mapped[str | None] = mapped_column(Text)
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+    has_credentials: Mapped[bool] = mapped_column(Boolean, default=False)
+    dedupe_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="new", index=True)
+    provenance: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
+    promoted_source_id: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

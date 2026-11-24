@@ -92,9 +92,16 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [ ] Active mode (ffprobe) behind an explicit toggle
 - [ ] Quality Monitor UI and notifications
 
-## P7 — Discovery — `[ ]`
+## P7 — Discovery — `[~]`
 
-iptv-org seeding + blocklist, forum adapter framework, extractors, Candidate Store, review UI.
+- [x] Extractors: M3U/M3U8, Xtream get.php/player_api, XMLTV, `#EXTM3U` bodies, base64 playlists
+- [x] RSS/Atom and HTML adapters with pagination and provenance
+- [x] Candidate store with dedupe, encrypted URLs, masked display, credential flag
+- [x] Review API: run, list, accept (creates a Source), reject, status
+- [ ] Discovery UI tab (review queue is API-only for now)
+- [ ] iptv-org catalog seeding + DMCA blocklist
+- [ ] Authenticated forum sessions (cookie import)
+- [ ] Scheduled re-crawls and change tracking of already-seen posts
 
 ## P8 — Telegram — `[~]`
 

@@ -11,6 +11,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import Text  # noqa: F401 - referenced by rendered JSONB variants
 
 ${imports if imports else ""}
 

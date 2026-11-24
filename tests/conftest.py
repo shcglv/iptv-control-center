@@ -12,6 +12,8 @@ os.environ["IPTV_ENCRYPTION_KEY"] = base64.b64encode(b"k" * 32).decode()
 os.environ["IPTV_DATABASE_URL"] = "sqlite+aiosqlite:///./data/pytest-unused.db"
 os.environ["IPTV_PUBLIC_BASE_URL"] = "http://test"
 os.environ["IPTV_ARTIFACTS_DIR"] = "./data/test-artifacts"
+# Tests fetch their own local HTTP servers for adapters and probes.
+os.environ["IPTV_ALLOW_PRIVATE_NETWORK_TARGETS"] = "1"
 
 from collections.abc import AsyncIterator
 

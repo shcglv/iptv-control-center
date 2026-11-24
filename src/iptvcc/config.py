@@ -22,6 +22,9 @@ class Settings(BaseSettings):
 
     display_timezone: str = "Europe/Moscow"
 
+    # SSRF policy. Private targets are refused by default; enable deliberately for LAN sources.
+    allow_private_network_targets: bool = False
+
     # Rendered playlists/guides and other generated files.
     artifacts_dir: str = "./data/artifacts"
 

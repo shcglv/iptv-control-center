@@ -7,8 +7,8 @@ server's only role in playback is an optional HTTP 302 that picks the best sourc
 > **Status: `0.1.0` — vertical slice.** Working: M3U import → channel catalog → playlist profiles
 > (visibility, order, source pins) → per-device playlist → quality-aware 302 source resolution →
 > XMLTV ingest with channel mapping and per-device guide output, autonomous health probing,
-> Telegram bot with commands and alerts, admin login with TOTP, and a React web UI. Not yet:
-> discovery, CI. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+> source discovery with a review queue, Telegram bot, admin login with TOTP, and a React web UI.
+> Not yet: discovery UI, CI. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## What it does today
 

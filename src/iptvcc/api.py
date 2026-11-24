@@ -40,6 +40,7 @@ from .models import (
     ChannelEpgMap,
     ChannelStream,
     Device,
+    DiscoveryCandidate,
     EpgChannel,
     EpgSource,
     PlaylistProfile,
@@ -52,9 +53,10 @@ from .models import (
 )
 from .netguard import UnsafeUrlError, fetch_text
 from .quality import compute
-from .secrets import mask_url
+from .secrets import decrypt, mask_url
 from .security import generate_device_token, hash_token, token_prefix
 from .services.delivery import build_playlist, get_active_assignment, resolve_stream
+from .services.discovery import ADAPTERS, store_items
 from .services.epg import (
     XmltvError,
     build_guide,
@@ -880,6 +882,184 @@ async def _profile_out(session: AsyncSession, profile: PlaylistProfile) -> Profi
         devices=devices,
         channels_visible=visible,
         channels_total=total,
+    )
+
+
+# --- discovery ---------------------------------------------------------------------------------
+
+
+class DiscoveryRunIn(BaseModel):
+    adapter: Literal["rss", "html"]
+    url: str = Field(min_length=8, max_length=2000)
+    limit: int = Field(default=50, ge=1, le=200)
+
+
+class DiscoveryRunOut(BaseModel):
+    adapter: str
+    items: int
+    created: int
+    updated: int
+
+
+class DiscoveryCandidateOut(BaseModel):
+    id: int
+    adapter: str
+    kind: str
+    url_masked: str
+    host: str
+    title: str | None
+    author: str | None
+    published_at: str | None
+    confidence: float
+    has_credentials: bool
+    status: str
+    created_at: datetime
+
+
+class DiscoveryCandidatePage(BaseModel):
+    total: int
+    items: list[DiscoveryCandidateOut]
+
+
+class CandidateAcceptIn(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+
+
+class DiscoveryStatusOut(BaseModel):
+    new: int
+    accepted: int
+    rejected: int
+    adapters: list[str]
+
+
+@app.post("/api/v1/discovery/run", response_model=DiscoveryRunOut, tags=["discovery"])
+async def discovery_run(
+    payload: DiscoveryRunIn, session: SessionDep, _: AdminDep
+) -> DiscoveryRunOut:
+    adapter = ADAPTERS[payload.adapter]()
+    try:
+        items = await adapter.discover(payload.url, limit=payload.limit)
+    except UnsafeUrlError as exc:
+        raise HTTPException(status_code=502, detail=f"discovery failed: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"discovery failed: {exc}") from exc
+
+    stats = await store_items(session, adapter=payload.adapter, items=items)
+    return DiscoveryRunOut(
+        adapter=payload.adapter,
+        items=len(items),
+        created=stats.created,
+        updated=stats.updated,
+    )
+
+
+@app.get("/api/v1/discovery/candidates", response_model=DiscoveryCandidatePage, tags=["discovery"])
+async def list_candidates(
+    session: SessionDep,
+    _: AdminDep,
+    status: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> DiscoveryCandidatePage:
+    statement = select(DiscoveryCandidate)
+    if status:
+        statement = statement.where(DiscoveryCandidate.status == status)
+    total = await session.scalar(select(func.count()).select_from(statement.subquery())) or 0
+    rows = (
+        await session.scalars(
+            statement.order_by(DiscoveryCandidate.id.desc()).limit(limit).offset(offset)
+        )
+    ).all()
+    return DiscoveryCandidatePage(
+        total=total,
+        items=[
+            DiscoveryCandidateOut(
+                id=row.id,
+                adapter=row.adapter,
+                kind=row.kind,
+                url_masked=row.url_masked,
+                host=row.host,
+                title=row.title,
+                author=row.author,
+                published_at=row.published_at,
+                confidence=row.confidence,
+                has_credentials=row.has_credentials,
+                status=row.status,
+                created_at=row.created_at,
+            )
+            for row in rows
+        ],
+    )
+
+
+@app.post(
+    "/api/v1/discovery/candidates/{candidate_id}/accept",
+    response_model=SourceOut,
+    tags=["discovery"],
+)
+async def accept_candidate(
+    candidate_id: int,
+    payload: CandidateAcceptIn,
+    session: SessionDep,
+    _: AdminDep,
+) -> SourceOut:
+    candidate = await session.get(DiscoveryCandidate, candidate_id)
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="candidate not found")
+    if candidate.status == "accepted":
+        raise HTTPException(status_code=409, detail="candidate already accepted")
+
+    base = (payload.name or candidate.title or candidate.host or "Discovered source").strip()
+    base = base[:200] or "Discovered source"
+    name = base
+    if await session.scalar(select(Source).where(Source.name == name)) is not None:
+        name = f"{base[:188]} ({candidate.id})"
+
+    source = Source(
+        name=name,
+        type="xtream" if candidate.kind == "xtream" else "m3u",
+        url=decrypt(candidate.url_enc),
+    )
+    session.add(source)
+    await session.flush()
+
+    candidate.status = "accepted"
+    candidate.promoted_source_id = source.id
+    await session.flush()
+    return _source_out(source)
+
+
+@app.post(
+    "/api/v1/discovery/candidates/{candidate_id}/reject",
+    status_code=204,
+    tags=["discovery"],
+)
+async def reject_candidate(candidate_id: int, session: SessionDep, _: AdminDep) -> Response:
+    candidate = await session.get(DiscoveryCandidate, candidate_id)
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="candidate not found")
+    candidate.status = "rejected"
+    await session.flush()
+    return Response(status_code=204)
+
+
+@app.get("/api/v1/discovery/status", response_model=DiscoveryStatusOut, tags=["discovery"])
+async def discovery_status(session: SessionDep, _: AdminDep) -> DiscoveryStatusOut:
+    counts: dict[str, int] = {}
+    for status in ("new", "accepted", "rejected"):
+        counts[status] = (
+            await session.scalar(
+                select(func.count())
+                .select_from(DiscoveryCandidate)
+                .where(DiscoveryCandidate.status == status)
+            )
+            or 0
+        )
+    return DiscoveryStatusOut(
+        new=counts["new"],
+        accepted=counts["accepted"],
+        rejected=counts["rejected"],
+        adapters=sorted(ADAPTERS),
     )
 
 

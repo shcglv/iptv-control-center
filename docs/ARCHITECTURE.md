@@ -63,6 +63,7 @@ Measured baselines on the host: postgres 15.9 MB RSS, comparable Python APIs 11�
 | `services/epg.py` | XMLTV ingest, channel mapping, per-device guide rendering |
 | `services/profiles.py` | effective lineup per playlist profile (visibility, order, pins) |
 | `services/delivery.py` | per-device playlist rendering, 302 resolver |
+| `services/discovery/` | extractors, RSS/HTML adapters, candidate store |
 | `telegram/` | Bot API adapter, long-polling bot, notification scan |
 | `api.py` | HTTP surface: admin API, `/p/...`, `/healthz`, SPA |
 | `web/` | React + TypeScript SPA (Vite), built into `src/iptvcc/static` |
@@ -220,6 +221,26 @@ API when `IPTV_TELEGRAM_BOT_TOKEN` is set and stops with it.
 
 Verified against a fake Bot API: 19 unit/integration tests plus a live run that registers the
 commands, polls, and delivers `🟡 Планировщик проверок ещё не запускался` to the allowlisted chat.
+
+## 6.7 Source discovery
+
+Discovery finds candidate links and keeps them out of the catalog until reviewed.
+
+```
+feed / forum page ──► adapter ──► extractors ──► candidate store ──► review ──► Source
+```
+
+| Piece | Behaviour |
+|---|---|
+| Extractors | `#EXTM3U` bodies, `.m3u/.m3u8`, Xtream `get.php`/`player_api.php`, XMLTV links, base64-embedded playlists (decoded, then accepted only if it really is a playlist) |
+| Credential handling | a URL carrying `username`/`password` is flagged `has_credentials`; only a **masked** form is stored for display and returned by the API. The raw URL is encrypted at rest with the same envelope as stream URLs |
+| RSS/Atom adapter | parses `item`/`entry`, keeps feed URL, item title, author and publication date as provenance |
+| HTML adapter | anchors, `<pre>/<code>/<textarea>` blocks and plain page text; follows `rel=next` for at most three pages |
+| Dedupe | `sha256(url)` unique; re-running a feed updates `last_seen_at` instead of duplicating |
+| Review | candidates are `new` until accepted (creates a `Source` with the inferred type) or rejected; accepting twice returns 409 |
+
+Adapters fetch through `netguard`, so SSRF rules apply to discovery exactly as to imports.
+`IPTV_ALLOW_PRIVATE_NETWORK_TARGETS` relaxes the address check for LAN sources and is off by default.
 
 ## 7. Security
 
