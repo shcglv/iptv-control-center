@@ -310,8 +310,9 @@ def test_discovery_reviews_a_candidate(
 
         page.get_by_role("button", name="Источники").click()
         page.wait_for_selector("text=Новый источник", timeout=10_000)
-        assert page.locator("table").get_by_text("UK playlist").count() >= 1 or page.locator(
-            "table"
-        ).get_by_text("Secret panel").count() >= 1
+        assert (
+            page.locator("table").get_by_text("UK playlist").count() >= 1
+            or page.locator("table").get_by_text("Secret panel").count() >= 1
+        )
 
         browser.close()
