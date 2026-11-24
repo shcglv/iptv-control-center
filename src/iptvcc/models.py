@@ -217,6 +217,42 @@ class Device(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class ProfileChannel(Base):
+    """Per-profile override for one channel.
+
+    Absence of a row means "inherit": the channel is visible with its catalog number. A row exists
+    only when the profile deviates (hidden, reordered, pinned to a specific source).
+    """
+
+    __tablename__ = "profile_channel"
+
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("playlist_profile.id", ondelete="CASCADE"), primary_key=True
+    )
+    channel_id: Mapped[str] = mapped_column(
+        ForeignKey("channel.id", ondelete="CASCADE"), primary_key=True
+    )
+    visible: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_index: Mapped[int | None] = mapped_column(Integer)
+    pinned_stream_id: Mapped[int | None] = mapped_column(Integer)
+
+
+class ProfileCategory(Base):
+    """Per-profile category visibility, order and display name."""
+
+    __tablename__ = "profile_category"
+
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("playlist_profile.id", ondelete="CASCADE"), primary_key=True
+    )
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("category.id", ondelete="CASCADE"), primary_key=True
+    )
+    visible: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_index: Mapped[int | None] = mapped_column(Integer)
+    display_name: Mapped[str | None] = mapped_column(String(128))
+
+
 class Assignment(Base):
     """A device's access grant: one token bound to one playlist profile."""
 

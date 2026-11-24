@@ -14,17 +14,15 @@ from sqlalchemy.orm import selectinload
 
 from ..m3u import CONTAINER_DASH, CONTAINER_HLS, CONTAINER_TS, RenderedChannel, render_m3u
 from ..models import (
-    ROLE_DISABLED,
     Assignment,
     Channel,
     ChannelEpgMap,
-    ChannelStream,
     EpgChannel,
-    PlaylistProfile,
     Stream,
 )
 from ..secrets import decrypt
 from ..security import hash_token
+from .profiles import pinned_stream_for, visible_channels
 from .selector import load_qualities, rank_links, select_stream_id
 
 _EXT_TO_CONTAINER = {
@@ -60,7 +58,13 @@ async def get_active_assignment(session: AsyncSession, token: str) -> Assignment
     return assignment
 
 
-async def resolve_stream(session: AsyncSession, public_key: str, ext: str) -> ResolvedStream | None:
+async def resolve_stream(
+    session: AsyncSession,
+    public_key: str,
+    ext: str,
+    *,
+    profile_id: int | None = None,
+) -> ResolvedStream | None:
     """Pick the best stream of a channel for the requested container.
 
     Never redirects across containers: a ``.ts`` URL that answers with an HLS manifest breaks
@@ -74,7 +78,8 @@ async def resolve_stream(session: AsyncSession, public_key: str, ext: str) -> Re
     if channel is None:
         return None
 
-    stream_id = await select_stream_id(session, channel, wanted)
+    pinned = await pinned_stream_for(session, profile_id, channel.id) if profile_id else None
+    stream_id = await select_stream_id(session, channel, wanted, pinned_stream_id=pinned)
     if stream_id is None:
         return None
     stream = await session.get(Stream, stream_id)
@@ -89,17 +94,8 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
     if assignment is None:
         return None
 
-    profile: PlaylistProfile = assignment.playlist_profile
-    channels = (
-        await session.scalars(
-            select(Channel)
-            .where(Channel.is_hidden.is_(False))
-            .options(selectinload(Channel.links).selectinload(ChannelStream.stream))
-            .options(selectinload(Channel.category))
-            .order_by(Channel.number, Channel.id)
-        )
-    ).all()
-
+    profile_id = assignment.playlist_profile_id
+    lineup = await visible_channels(session, profile_id)
     qualities = await load_qualities(session)
     xmltv_ids = dict(
         (
@@ -112,10 +108,19 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
     )
 
     rendered: list[RenderedChannel] = []
-    for channel in channels:
+    for item in lineup:
+        channel = item.channel
         ranked = rank_links(channel, qualities, None)
         if not ranked:
             continue
+        chosen = ranked[0]
+        if item.pinned_stream_id is not None:
+            pinned = next(
+                (candidate for candidate in ranked if candidate.stream_id == item.pinned_stream_id),
+                None,
+            )
+            if pinned is not None:
+                chosen = pinned
         rendered.append(
             RenderedChannel(
                 public_key=channel.public_key,
@@ -128,20 +133,9 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
                 ),
                 logo_url=channel.logo_url,
                 number=channel.number,
-                group=channel.category.name if channel.category else None,
-                ext=ext_for(ranked[0].container),
+                group=item.group_name,
+                ext=ext_for(chosen.container),
             )
         )
 
-    _ = profile  # profile filtering (visibility/order) lands with Playlist Studio
     return render_m3u(rendered, base_url=base_url, token=token)
-
-
-__all__ = [
-    "ROLE_DISABLED",
-    "ResolvedStream",
-    "build_playlist",
-    "ext_for",
-    "get_active_assignment",
-    "resolve_stream",
-]

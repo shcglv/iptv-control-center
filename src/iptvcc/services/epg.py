@@ -29,6 +29,7 @@ from .. import __version__
 from ..matching import normalize
 from ..models import Channel, ChannelEpgMap, EpgChannel, EpgSource, Programme
 from .delivery import get_active_assignment
+from .profiles import visible_channels
 
 BATCH_SIZE = 2000
 MAX_DOCUMENT_BYTES = 512 * 1024 * 1024
@@ -288,23 +289,31 @@ async def map_channels(session: AsyncSession) -> int:
 async def epg_ids_for_assignment(
     session: AsyncSession, token: str
 ) -> list[tuple[str, int, str, str | None]] | None:
-    """Return ``(channel_id, epg_channel_id, xmltv_id, display_name)`` for a device's channels."""
+    """Return ``(channel_id, epg_channel_id, xmltv_id, display_name)`` for a device's lineup."""
     assignment = await get_active_assignment(session, token)
     if assignment is None:
         return None
 
-    rows = (
-        await session.execute(
-            select(Channel, ChannelEpgMap, EpgChannel)
-            .join(ChannelEpgMap, ChannelEpgMap.channel_id == Channel.id)
-            .join(EpgChannel, EpgChannel.id == ChannelEpgMap.epg_channel_id)
-            .where(Channel.is_hidden.is_(False))
-            .order_by(Channel.number, Channel.id)
-        )
-    ).all()
-    return [
-        (channel.id, epg.id, epg.source_tvg_id, channel.display_name) for channel, _map, epg in rows
-    ]
+    mapping = {
+        row[0]: (row[1], row[2])
+        for row in (
+            await session.execute(
+                select(ChannelEpgMap.channel_id, EpgChannel.id, EpgChannel.source_tvg_id).join(
+                    EpgChannel, EpgChannel.id == ChannelEpgMap.epg_channel_id
+                )
+            )
+        ).all()
+    }
+
+    entries: list[tuple[str, int, str, str | None]] = []
+    for item in await visible_channels(session, assignment.playlist_profile_id):
+        channel = item.channel
+        mapped = mapping.get(channel.id)
+        if mapped is None:
+            continue
+        epg_channel_id, xmltv_id = mapped
+        entries.append((channel.id, epg_channel_id, xmltv_id, channel.display_name))
+    return entries
 
 
 def guide_cache_key(token: str) -> str:

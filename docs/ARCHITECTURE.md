@@ -61,6 +61,7 @@ Measured baselines on the host: postgres 15.9 MB RSS, comparable Python APIs 11�
 | `services/scheduler.py` | scheduler lease, tier intervals, watchdog |
 | `services/selector.py` | candidate ranking and the anti-flapping decision |
 | `services/epg.py` | XMLTV ingest, channel mapping, per-device guide rendering |
+| `services/profiles.py` | effective lineup per playlist profile (visibility, order, pins) |
 | `services/delivery.py` | per-device playlist rendering, 302 resolver |
 | `api.py` | HTTP surface: admin API, `/p/...`, `/healthz` |
 
@@ -147,8 +148,7 @@ choice is remembered on `channel.active_stream_id` / `active_since_epoch`.
 renderer uses the ranking across all containers to decide which extension to advertise, so the
 advertised suffix always matches the stream a player will receive.
 
-**Scheduling.** An in-process task starts with the API and claims a lease before each round. The
-lease is a conditional `UPDATE` on a single `scheduler_state` row (`locked_until < now OR owner =
+**Scheduling.** An in-process task starts with the API and claims a lease before each round. Thelease is a conditional `UPDATE` on a single `scheduler_state` row (`locked_until < now OR owner =
 me`), which is atomic on SQLite and PostgreSQL without database-specific advisory-lock functions, so
 a second replica cannot double-probe. Due-ness is age based: streams of channels served within 24 h
 are *hot* (every 5 min by default), everything else *cold* (hourly).
@@ -156,6 +156,22 @@ are *hot* (every 5 min by default), everything else *cold* (hourly).
 The watchdog reads the same row: if no tick arrived within `max(3 × tick, 300)` seconds, the status
 reports `healthy: false`. A manual `POST /api/v1/scheduler/tick` is refused while the loop owns the
 lease — which is also the live proof that the lease works.
+
+## 6.4 Playlist profiles
+
+A profile stores **overrides only**. A channel without a `profile_channel` row is visible with its
+catalog number, so a new profile starts with the full lineup and no seeding of thousands of rows.
+
+| Rule | Behaviour |
+|---|---|
+| Channel visibility | `profile_channel.visible = false` hides it; deleting the row restores the catalog default |
+| Category visibility | `profile_category.visible = false` hides the category's channels, **unless** a channel is explicitly re-enabled |
+| Ordering | `sort_index` when set, otherwise the channel number, then id — deterministic |
+| Group name | `profile_category.display_name` renames the group in the M3U |
+| Source pin | `profile_channel.pinned_stream_id` wins when that stream is playable in the requested container; otherwise ranking takes over |
+
+The same resolution feeds both the playlist and the per-device XMLTV, so a hidden channel disappears
+from the playlist and from the guide together.
 
 ## 7. Security
 
@@ -177,8 +193,8 @@ No new infrastructure components. Builds run in Coolify; releases also publish a
 
 ## 9. What is not implemented yet
 
-Active probe mode (ffprobe) · quality UI and notifications · playlist-profile channel filtering ·
-Playlist Studio · web UI · discovery/forum adapters · Telegram bot · CI pipeline · Coolify resources.
+Active probe mode (ffprobe) · quality UI and notifications · Playlist Studio drag-and-drop editor ·
+web UI · discovery/forum adapters · Telegram bot · CI pipeline · Coolify resources.
 Tracked in `docs/ROADMAP.md`.
 
 ## 10. Reproducibility

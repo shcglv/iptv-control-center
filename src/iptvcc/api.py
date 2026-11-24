@@ -34,6 +34,7 @@ from .db import create_schema, dispose_engine, get_session, get_session_factory
 from .models import (
     AdminUser,
     Assignment,
+    Category,
     Channel,
     ChannelEpgMap,
     ChannelStream,
@@ -41,6 +42,8 @@ from .models import (
     EpgChannel,
     EpgSource,
     PlaylistProfile,
+    ProfileCategory,
+    ProfileChannel,
     Programme,
     Source,
     Stream,
@@ -60,6 +63,7 @@ from .services.epg import (
 )
 from .services.health import run_probe_round
 from .services.importing import ImportStats, import_playlist
+from .services.profiles import load_channel_overrides, visible_channels
 from .services.scheduler import ProbeScheduler, scheduler_status
 from .services.selector import rank_candidates
 
@@ -572,6 +576,237 @@ async def _serve_epg(token: str, session: AsyncSession, *, gzipped: bool) -> Fil
     )
 
 
+# --- playlist profiles -------------------------------------------------------------------------
+
+
+class ProfileCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    strategy: str = "balanced"
+    is_default: bool = False
+
+
+class ProfileOut(BaseModel):
+    id: int
+    name: str
+    strategy: str
+    is_default: bool
+    devices: int
+    channels_visible: int
+    channels_total: int
+
+
+class ProfileChannelOut(BaseModel):
+    public_key: str
+    name: str
+    number: int | None
+    group: str | None
+    visible: bool
+    sort_index: int | None
+    pinned_stream_id: int | None
+    overridden: bool
+
+
+class ChannelOverrideIn(BaseModel):
+    """Full replacement of a channel override. Use DELETE to fall back to the catalog."""
+
+    visible: bool = True
+    sort_index: int | None = None
+    pinned_stream_id: int | None = None
+
+
+class CategoryOverrideIn(BaseModel):
+    visible: bool = True
+    sort_index: int | None = None
+    display_name: str | None = None
+
+
+@app.post("/api/v1/profiles", response_model=ProfileOut, status_code=201, tags=["profiles"])
+async def create_profile(payload: ProfileCreate, session: SessionDep, _: AdminDep) -> ProfileOut:
+    existing = await session.scalar(
+        select(PlaylistProfile).where(PlaylistProfile.name == payload.name)
+    )
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="profile name already exists")
+    profile = PlaylistProfile(
+        name=payload.name, strategy=payload.strategy, is_default=payload.is_default
+    )
+    session.add(profile)
+    await session.flush()
+    return await _profile_out(session, profile)
+
+
+@app.get("/api/v1/profiles", response_model=list[ProfileOut], tags=["profiles"])
+async def list_profiles(session: SessionDep, _: AdminDep) -> list[ProfileOut]:
+    profiles = (await session.scalars(select(PlaylistProfile).order_by(PlaylistProfile.id))).all()
+    return [await _profile_out(session, profile) for profile in profiles]
+
+
+@app.get(
+    "/api/v1/profiles/{profile_id}/channels",
+    response_model=list[ProfileChannelOut],
+    tags=["profiles"],
+)
+async def list_profile_channels(
+    profile_id: int, session: SessionDep, _: AdminDep
+) -> list[ProfileChannelOut]:
+    profile = await session.get(PlaylistProfile, profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="profile not found")
+
+    overrides = await load_channel_overrides(session, profile_id)
+    lineup = await visible_channels(session, profile_id)
+    visible_ids = {item.channel.id for item in lineup}
+
+    all_channels = (
+        await session.scalars(
+            select(Channel)
+            .where(Channel.is_hidden.is_(False))
+            .options(selectinload(Channel.category))
+            .order_by(Channel.number, Channel.id)
+        )
+    ).all()
+
+    result: list[ProfileChannelOut] = []
+    for channel in all_channels:
+        override = overrides.get(channel.id)
+        result.append(
+            ProfileChannelOut(
+                public_key=channel.public_key,
+                name=channel.display_name,
+                number=channel.number,
+                group=channel.category.name if channel.category else None,
+                visible=channel.id in visible_ids,
+                sort_index=override.sort_index if override else None,
+                pinned_stream_id=override.pinned_stream_id if override else None,
+                overridden=override is not None,
+            )
+        )
+    return result
+
+
+@app.put(
+    "/api/v1/profiles/{profile_id}/channels/{public_key}",
+    response_model=ProfileChannelOut,
+    tags=["profiles"],
+)
+async def set_profile_channel(
+    profile_id: int,
+    public_key: str,
+    payload: ChannelOverrideIn,
+    session: SessionDep,
+    _: AdminDep,
+) -> ProfileChannelOut:
+    profile = await session.get(PlaylistProfile, profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="profile not found")
+    channel = await session.scalar(
+        select(Channel)
+        .where(Channel.public_key == public_key)
+        .options(selectinload(Channel.category))
+    )
+    if channel is None:
+        raise HTTPException(status_code=404, detail="channel not found")
+    if payload.pinned_stream_id is not None:
+        pinned = await session.get(Stream, payload.pinned_stream_id)
+        if pinned is None or pinned.source_id is None:
+            raise HTTPException(status_code=422, detail="pinned stream does not exist")
+
+    override = await session.get(ProfileChannel, (profile_id, channel.id))
+    if override is None:
+        override = ProfileChannel(profile_id=profile_id, channel_id=channel.id)
+        session.add(override)
+    override.visible = payload.visible
+    override.sort_index = payload.sort_index
+    override.pinned_stream_id = payload.pinned_stream_id
+    await session.flush()
+
+    return ProfileChannelOut(
+        public_key=channel.public_key,
+        name=channel.display_name,
+        number=channel.number,
+        group=channel.category.name if channel.category else None,
+        visible=payload.visible,
+        sort_index=payload.sort_index,
+        pinned_stream_id=payload.pinned_stream_id,
+        overridden=True,
+    )
+
+
+@app.delete(
+    "/api/v1/profiles/{profile_id}/channels/{public_key}",
+    status_code=204,
+    tags=["profiles"],
+)
+async def clear_profile_channel(
+    profile_id: int, public_key: str, session: SessionDep, _: AdminDep
+) -> Response:
+    channel = await session.scalar(select(Channel).where(Channel.public_key == public_key))
+    if channel is None:
+        raise HTTPException(status_code=404, detail="channel not found")
+    override = await session.get(ProfileChannel, (profile_id, channel.id))
+    if override is not None:
+        await session.delete(override)
+        await session.flush()
+    return Response(status_code=204)
+
+
+@app.put(
+    "/api/v1/profiles/{profile_id}/categories/{category_id}",
+    status_code=204,
+    tags=["profiles"],
+)
+async def set_profile_category(
+    profile_id: int,
+    category_id: int,
+    payload: CategoryOverrideIn,
+    session: SessionDep,
+    _: AdminDep,
+) -> Response:
+    profile = await session.get(PlaylistProfile, profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="profile not found")
+    category = await session.get(Category, category_id)
+    if category is None:
+        raise HTTPException(status_code=404, detail="category not found")
+
+    override = await session.get(ProfileCategory, (profile_id, category_id))
+    if override is None:
+        override = ProfileCategory(profile_id=profile_id, category_id=category_id)
+        session.add(override)
+    override.visible = payload.visible
+    override.sort_index = payload.sort_index
+    override.display_name = payload.display_name
+    await session.flush()
+    return Response(status_code=204)
+
+
+async def _profile_out(session: AsyncSession, profile: PlaylistProfile) -> ProfileOut:
+    devices = (
+        await session.scalar(
+            select(func.count())
+            .select_from(Assignment)
+            .where(Assignment.playlist_profile_id == profile.id)
+        )
+        or 0
+    )
+    total = (
+        await session.scalar(
+            select(func.count()).select_from(Channel).where(Channel.is_hidden.is_(False))
+        )
+        or 0
+    )
+    visible = len(await visible_channels(session, profile.id))
+    return ProfileOut(
+        id=profile.id,
+        name=profile.name,
+        strategy=profile.strategy,
+        is_default=profile.is_default,
+        devices=devices,
+        channels_visible=visible,
+        channels_total=total,
+    )
+
+
 # --- health and quality ------------------------------------------------------------------------
 
 
@@ -749,9 +984,12 @@ async def device_playlist(token: str, request: Request, session: SessionDep) -> 
 
 @app.get("/p/{token}/s/{public_key}.{ext}", tags=["delivery"])
 async def resolve(token: str, public_key: str, ext: str, session: SessionDep) -> RedirectResponse:
-    if await get_active_assignment(session, token) is None:
+    assignment = await get_active_assignment(session, token)
+    if assignment is None:
         raise HTTPException(status_code=404, detail="unknown or revoked token")
-    stream = await resolve_stream(session, public_key, ext)
+    stream = await resolve_stream(
+        session, public_key, ext, profile_id=assignment.playlist_profile_id
+    )
     if stream is None:
         raise HTTPException(
             status_code=503, detail="no healthy source for this container right now"

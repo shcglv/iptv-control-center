@@ -4,10 +4,11 @@ Self-hosted control plane for IPTV: sources, a single channel catalog, EPG, qual
 per-device playlists. **Video never transits the server** — playlists point at provider URLs, and the
 server's only role in playback is an optional HTTP 302 that picks the best source at request time.
 
-> **Status: `0.1.0` — vertical slice.** Working: M3U import → channel catalog → per-device playlist →
-> quality-aware 302 source resolution → XMLTV ingest with channel mapping and per-device guide
-> output, autonomous health probing, plus admin login with TOTP and Alembic migrations. Not yet:
-> discovery, Telegram, web UI. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+> **Status: `0.1.0` — vertical slice.** Working: M3U import → channel catalog → playlist profiles
+> (visibility, order, source pins) → per-device playlist → quality-aware 302 source resolution →
+> XMLTV ingest with channel mapping and per-device guide output, autonomous health probing, plus
+> admin login with TOTP and Alembic migrations. Not yet: discovery, Telegram, web UI.
+> See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## What it does today
 

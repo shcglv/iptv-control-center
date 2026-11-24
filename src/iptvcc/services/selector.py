@@ -97,11 +97,26 @@ async def rank_candidates(
     return _rank(links, qualities, ext)
 
 
-async def select_stream_id(session: AsyncSession, channel: Channel, ext: str | None) -> int | None:
-    """Pick a stream id, honouring the dwell time before switching away from the current one."""
+async def select_stream_id(
+    session: AsyncSession,
+    channel: Channel,
+    ext: str | None,
+    *,
+    pinned_stream_id: int | None = None,
+) -> int | None:
+    """Pick a stream id.
+
+    A profile pin wins when that stream is playable in the requested container; the dwell-time
+    rule then protects the current choice from flapping.
+    """
     candidates = await rank_candidates(session, channel, ext)
     if not candidates:
         return None
+
+    if pinned_stream_id is not None:
+        pinned = next((item for item in candidates if item.stream_id == pinned_stream_id), None)
+        if pinned is not None:
+            return pinned.stream_id
 
     best = candidates[0]
     current_id = channel.active_stream_id

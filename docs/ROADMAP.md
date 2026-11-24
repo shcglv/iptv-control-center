@@ -56,9 +56,8 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] Device + assignment + hashed token, instant revocation, rotation
 - [x] Deterministic per-device M3U with all three EPG attrs
 - [x] 302 resolver, container guard, HEAD
+- [x] Playlist-profile visibility, ordering, category rules and source pins; playlist and guide share the lineup
 - [ ] Client Compatibility Engine (capability registry, `RenderPlan`)
-- [ ] Playlist-profile filtering and ordering
-- [ ] XMLTV endpoint per device
 - [ ] Devices & Clients UI, QR, copy actions
 
 ## P4b — Playlist Studio — `[ ]`
