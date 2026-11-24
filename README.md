@@ -5,9 +5,9 @@ per-device playlists. **Video never transits the server** — playlists point at
 server's only role in playback is an optional HTTP 302 that picks the best source at request time.
 
 > **Status: `0.1.0` — vertical slice.** Working: M3U import → channel catalog → per-device playlist →
-> 302 source resolution, XMLTV ingest with channel mapping and per-device guide output, plus admin
-> login with TOTP and Alembic migrations. Not yet: quality engine, discovery, Telegram, web UI.
-> See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+> quality-aware 302 source resolution → XMLTV ingest with channel mapping and per-device guide
+> output, plus admin login with TOTP and Alembic migrations. Not yet: probe scheduling, discovery,
+> Telegram, web UI. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## What it does today
 

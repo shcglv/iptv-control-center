@@ -14,6 +14,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -141,6 +142,11 @@ class Channel(Base):
     epg_id: Mapped[str | None] = mapped_column(String(255))
     match_key: Mapped[str | None] = mapped_column(String(512), index=True)
     is_hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Selection memory: lets the selector keep its current source instead of flapping between
+    # two streams whose scores are within the hysteresis band.
+    active_stream_id: Mapped[int | None] = mapped_column(Integer)
+    active_since_epoch: Mapped[int | None] = mapped_column(Integer)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -314,10 +320,53 @@ class ChannelEpgMap(Base):
         ForeignKey("epg_channel.id", ondelete="CASCADE"), index=True
     )
     method: Mapped[str] = mapped_column(String(24), default="tvg_id")
-    confidence: Mapped[float] = mapped_column(default=1.0)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
     is_manual: Mapped[bool] = mapped_column(Boolean, default=False)
 
     epg_channel: Mapped[EpgChannel] = relationship()
+
+
+# --- health and quality ------------------------------------------------------------------------
+
+
+class HealthCheck(Base):
+    """One probe result. Pruned after a week; aggregates live in ``stream_quality``."""
+
+    __tablename__ = "health_check"
+    __table_args__ = (Index("ix_health_check_stream_time", "stream_id", "checked_epoch"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    stream_id: Mapped[int] = mapped_column(ForeignKey("stream.id", ondelete="CASCADE"), index=True)
+    checked_epoch: Mapped[int] = mapped_column(Integer)
+    ok: Mapped[bool] = mapped_column(Boolean)
+    dns_ms: Mapped[float | None] = mapped_column(Float)
+    ttfb_ms: Mapped[float | None] = mapped_column(Float)
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    error_class: Mapped[str | None] = mapped_column(String(32))
+
+
+class StreamQuality(Base):
+    """Materialised aggregate for one stream: uptime, latency and last observed format."""
+
+    __tablename__ = "stream_quality"
+
+    stream_id: Mapped[int] = mapped_column(
+        ForeignKey("stream.id", ondelete="CASCADE"), primary_key=True
+    )
+    checks: Mapped[int] = mapped_column(Integer, default=0)
+    failures: Mapped[int] = mapped_column(Integer, default=0)
+    uptime_ratio: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_ttfb_ms: Mapped[float | None] = mapped_column(Float)
+    p90_ttfb_ms: Mapped[float | None] = mapped_column(Float)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+    last_ok_epoch: Mapped[int | None] = mapped_column(Integer)
+    last_checked_epoch: Mapped[int | None] = mapped_column(Integer)
+    last_error_class: Mapped[str | None] = mapped_column(String(32))
+
+    resolution: Mapped[str | None] = mapped_column(String(24))
+    video_codec: Mapped[str | None] = mapped_column(String(32))
+    audio_codec: Mapped[str | None] = mapped_column(String(32))
+    bandwidth_bps: Mapped[int | None] = mapped_column(Integer)
 
 
 # --- admin identity ----------------------------------------------------------------------------

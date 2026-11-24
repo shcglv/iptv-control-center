@@ -42,8 +42,11 @@ from .models import (
     PlaylistProfile,
     Programme,
     Source,
+    Stream,
+    StreamQuality,
 )
 from .netguard import UnsafeUrlError, fetch_text
+from .quality import compute
 from .secrets import mask_url
 from .security import generate_device_token, hash_token, token_prefix
 from .services.delivery import build_playlist, get_active_assignment, resolve_stream
@@ -54,7 +57,9 @@ from .services.epg import (
     ingest_xmltv,
     map_channels,
 )
+from .services.health import run_probe_round
 from .services.importing import ImportStats, import_playlist
+from .services.selector import rank_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -550,6 +555,126 @@ async def _serve_epg(token: str, session: AsyncSession, *, gzipped: bool) -> Fil
         path,
         media_type="application/gzip" if gzipped else "application/xml",
         headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+# --- health and quality ------------------------------------------------------------------------
+
+
+class HealthRunRequest(BaseModel):
+    limit: int = Field(default=50, ge=1, le=500)
+
+
+class HealthRunResponse(BaseModel):
+    probed: int
+    ok: int
+    failed: int
+
+
+class StreamHealthOut(BaseModel):
+    stream_id: int
+    source: str
+    name: str
+    container: str
+    score: float
+    uptime_ratio: float
+    checks: int
+    failures: int
+    p90_ttfb_ms: float | None
+    resolution: str | None
+    video_codec: str | None
+    last_error: str | None
+
+
+class CandidateOut(BaseModel):
+    stream_id: int
+    container: str
+    score: float
+    breakdown: dict[str, float]
+
+
+class ChannelHealthOut(BaseModel):
+    public_key: str
+    name: str
+    active_stream_id: int | None
+    candidates: list[CandidateOut]
+
+
+@app.post("/api/v1/health/run", response_model=HealthRunResponse, tags=["health"])
+async def run_health(
+    payload: HealthRunRequest, session: SessionDep, _: AdminDep
+) -> HealthRunResponse:
+    stats = await run_probe_round(session, limit=payload.limit)
+    return HealthRunResponse(**stats)
+
+
+@app.get("/api/v1/health/streams", response_model=list[StreamHealthOut], tags=["health"])
+async def list_stream_health(
+    session: SessionDep,
+    _: AdminDep,
+    limit: int = Query(default=100, ge=1, le=1000),
+) -> list[StreamHealthOut]:
+    rows = (
+        await session.execute(
+            select(Stream, StreamQuality, Source)
+            .join(Source, Source.id == Stream.source_id)
+            .outerjoin(StreamQuality, StreamQuality.stream_id == Stream.id)
+            .order_by(StreamQuality.uptime_ratio.asc().nullsfirst(), Stream.id)
+            .limit(limit)
+        )
+    ).all()
+
+    out: list[StreamHealthOut] = []
+    for stream, quality, source in rows:
+        breakdown = compute(
+            uptime_ratio=quality.uptime_ratio if quality else None,
+            checks=quality.checks if quality else 0,
+            failures=quality.failures if quality else 0,
+            p90_ttfb_ms=quality.p90_ttfb_ms if quality else None,
+            resolution=quality.resolution if quality else None,
+            video_codec=quality.video_codec if quality else None,
+            bandwidth_bps=quality.bandwidth_bps if quality else None,
+            container=stream.container,
+            requested_ext=stream.container,
+        )
+        out.append(
+            StreamHealthOut(
+                stream_id=stream.id,
+                source=source.name,
+                name=stream.name,
+                container=stream.container,
+                score=breakdown.total,
+                uptime_ratio=quality.uptime_ratio if quality else 0.0,
+                checks=quality.checks if quality else 0,
+                failures=quality.failures if quality else 0,
+                p90_ttfb_ms=quality.p90_ttfb_ms if quality else None,
+                resolution=quality.resolution if quality else None,
+                video_codec=quality.video_codec if quality else None,
+                last_error=quality.last_error_class if quality else None,
+            )
+        )
+    return out
+
+
+@app.get("/api/v1/health/channels/{public_key}", response_model=ChannelHealthOut, tags=["health"])
+async def channel_health(public_key: str, session: SessionDep, _: AdminDep) -> ChannelHealthOut:
+    channel = await session.scalar(select(Channel).where(Channel.public_key == public_key))
+    if channel is None:
+        raise HTTPException(status_code=404, detail="channel not found")
+    candidates = await rank_candidates(session, channel, None)
+    return ChannelHealthOut(
+        public_key=channel.public_key,
+        name=channel.display_name,
+        active_stream_id=channel.active_stream_id,
+        candidates=[
+            CandidateOut(
+                stream_id=candidate.stream_id,
+                container=candidate.container,
+                score=candidate.score,
+                breakdown=candidate.breakdown.__dict__,
+            )
+            for candidate in candidates
+        ],
     )
 
 

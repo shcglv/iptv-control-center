@@ -76,10 +76,17 @@ Drag & drop editor, impact panel, M3U/EPG preview.
 - [ ] EPG management view + TV guide view in the UI
 - [ ] `iptv-org/epg` sidecar (optional, licence caveat)
 
-## P6 — Health and quality — `[ ]`
+## P6 — Health and quality — `[~]`
 
-Probes (passive/light/active), T0–T4 scheduler with a provider-slot budget, scoring
-(`0.40R + 0.15S + 0.25T + 0.10C + 0.10E`), strategies, hysteresis, watchdog, Quality UI.
+- [x] Light probe: DNS, HTTP with a 2 KB range read, HLS master parsing (resolution, codecs, bandwidth)
+- [x] `health_check` samples and `stream_quality` aggregates (uptime, p90 TTFB, failures, last error)
+- [x] Composite score with reliability > resolution (asserted by a test)
+- [x] Anti-flapping: +10 margin and 15-minute dwell, persisted per channel
+- [x] Resolver and playlist renderer use the ranking
+- [x] Admin API: run a round, list stream health, inspect channel candidates
+- [ ] T0–T4 scheduling with a provider connection-slot budget and watchdog
+- [ ] Active mode (ffprobe) behind an explicit toggle
+- [ ] Quality Monitor UI and notifications
 
 ## P7 — Discovery — `[ ]`
 

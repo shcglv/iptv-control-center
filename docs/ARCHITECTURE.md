@@ -53,9 +53,12 @@ Measured baselines on the host: postgres 15.9 MB RSS, comparable Python APIs 11�
 | `secrets.py` | AES-256-GCM envelopes for values at rest, `mask_url` for logs |
 | `m3u.py` | tolerant parser + deterministic renderer |
 | `matching.py` | normalisation, region extraction, fuzzy scoring, thresholds |
+| `quality.py` | composite score (reliability, startup, technical, compatibility, errors) |
 | `netguard.py` | SSRF guard for any user-supplied URL (scheme, resolve, redirects, size) |
 | `security.py` | device tokens (hashed), public keys, constant-time compare |
 | `services/importing.py` | parse → upsert streams → attach to channels (idempotent) |
+| `services/health.py` | light probes, `health_check` samples, `stream_quality` aggregates |
+| `services/selector.py` | candidate ranking and the anti-flapping decision |
 | `services/epg.py` | XMLTV ingest, channel mapping, per-device guide rendering |
 | `services/delivery.py` | per-device playlist rendering, 302 resolver |
 | `api.py` | HTTP surface: admin API, `/p/...`, `/healthz` |
@@ -112,6 +115,37 @@ Programmes are stored as UTC epoch seconds — unambiguous on SQLite and Postgre
 - `GET /p/<token>/epg.xml` and `.xml.gz` render the device's own channel subset, cached for 5
   minutes on disk keyed by a hash of the token (the token itself never appears in a filename).
 
+## 6.3 Health, quality and selection
+
+**Probe (light mode).** DNS lookup, then one HTTP request with `Range: bytes=0-2047` that is read,
+measured to first byte, and closed. It never opens a sustained media connection. If the body starts
+with `#EXTM3U`, the master playlist yields `RESOLUTION`, `CODECS` and `BANDWIDTH` — so format is
+known without ffprobe. Connect time is not measured separately (that would cost a second
+connection); `ttfb_ms` covers connect + request + first byte.
+
+**Aggregates.** Every probe writes a `health_check` row and refreshes `stream_quality`:
+`uptime_ratio`, `avg_ttfb_ms`, `p90_ttfb_ms` over the last 50 successful samples,
+`consecutive_failures`, last error class, and the last observed format. Samples are pruned after
+seven days.
+
+**Score.**
+
+```
+score = 100 * (0.40*reliability + 0.15*startup + 0.25*technical + 0.10*compatibility + 0.10*errors)
+technical = 0.55*resolution + 0.30*codec + 0.15*bitrate_adequacy
+```
+
+A stable 720p stream beats a flapping 4K one — that is asserted by a test, not just documented.
+FPS is absent because it needs ffprobe (optional active mode).
+
+**Anti-flapping.** The selector keeps the channel's current stream unless a candidate is better by
+at least 10 points **and** the current choice is older than 15 minutes (or is dead). The current
+choice is remembered on `channel.active_stream_id` / `active_since_epoch`.
+
+**Where it is used.** The resolver picks the best stream of the requested container. The playlist
+renderer uses the ranking across all containers to decide which extension to advertise, so the
+advertised suffix always matches the stream a player will receive.
+
 ## 7. Security
 
 | Concern | Control |
@@ -132,9 +166,9 @@ No new infrastructure components. Builds run in Coolify; releases also publish a
 
 ## 9. What is not implemented yet
 
-Quality engine · playlist-profile channel filtering · Playlist Studio · web UI · discovery/forum
-adapters · Telegram bot · notifications · CI pipeline · Coolify resources.
-Tracked in `docs/ROADMAP.md`.
+Automatic probe scheduling (T0–T4 tiers) · quality UI · playlist-profile channel filtering ·
+Playlist Studio · web UI · discovery/forum adapters · Telegram bot · notifications · CI pipeline ·
+Coolify resources. Tracked in `docs/ROADMAP.md`.
 
 ## 10. Reproducibility
 

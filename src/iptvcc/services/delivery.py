@@ -25,6 +25,7 @@ from ..models import (
 )
 from ..secrets import decrypt
 from ..security import hash_token
+from .selector import load_qualities, rank_links, select_stream_id
 
 _EXT_TO_CONTAINER = {
     "ts": CONTAINER_TS,
@@ -60,7 +61,7 @@ async def get_active_assignment(session: AsyncSession, token: str) -> Assignment
 
 
 async def resolve_stream(session: AsyncSession, public_key: str, ext: str) -> ResolvedStream | None:
-    """Pick the best stream of a channel that matches the requested container.
+    """Pick the best stream of a channel for the requested container.
 
     Never redirects across containers: a ``.ts`` URL that answers with an HLS manifest breaks
     ExoPlayer and loops mpv (documented in OwnTV's source).
@@ -73,23 +74,13 @@ async def resolve_stream(session: AsyncSession, public_key: str, ext: str) -> Re
     if channel is None:
         return None
 
-    links = (
-        await session.scalars(
-            select(ChannelStream)
-            .where(ChannelStream.channel_id == channel.id)
-            .options(selectinload(ChannelStream.stream))
-            .order_by(ChannelStream.priority, ChannelStream.id)
-        )
-    ).all()
-
-    for link in links:
-        stream = link.stream
-        if link.role == ROLE_DISABLED or stream.is_stale:
-            continue
-        if stream.container != wanted:
-            continue
-        return ResolvedStream(url=decrypt(stream.url_enc), container=stream.container)
-    return None
+    stream_id = await select_stream_id(session, channel, wanted)
+    if stream_id is None:
+        return None
+    stream = await session.get(Stream, stream_id)
+    if stream is None:
+        return None
+    return ResolvedStream(url=decrypt(stream.url_enc), container=stream.container)
 
 
 async def build_playlist(session: AsyncSession, token: str, base_url: str) -> str | None:
@@ -109,7 +100,7 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
         )
     ).all()
 
-    rendered: list[RenderedChannel] = []
+    qualities = await load_qualities(session)
     xmltv_ids = dict(
         (
             await session.execute(
@@ -119,9 +110,11 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
             )
         ).all()
     )
+
+    rendered: list[RenderedChannel] = []
     for channel in channels:
-        best = _primary_stream(channel)
-        if best is None:
+        ranked = rank_links(channel, qualities, None)
+        if not ranked:
             continue
         rendered.append(
             RenderedChannel(
@@ -136,7 +129,7 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
                 logo_url=channel.logo_url,
                 number=channel.number,
                 group=channel.category.name if channel.category else None,
-                ext=ext_for(best.container),
+                ext=ext_for(ranked[0].container),
             )
         )
 
@@ -144,10 +137,11 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
     return render_m3u(rendered, base_url=base_url, token=token)
 
 
-def _primary_stream(channel: Channel) -> Stream | None:
-    links = sorted(channel.links, key=lambda link: (link.priority, link.id))
-    for link in links:
-        if link.role == ROLE_DISABLED or link.stream.is_stale:
-            continue
-        return link.stream
-    return None
+__all__ = [
+    "ROLE_DISABLED",
+    "ResolvedStream",
+    "build_playlist",
+    "ext_for",
+    "get_active_assignment",
+    "resolve_stream",
+]
