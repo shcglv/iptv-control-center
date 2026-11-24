@@ -24,9 +24,9 @@ Legend: `[x]` shipped and verified · `[~]` partially shipped · `[ ]` not start
 - [x] SSRF guard
 - [x] Alembic migrations (initial schema, applied by `scripts/start.sh`)
 - [x] Admin password + TOTP login, sessions, CSRF
-- [ ] Web UI shell (Prism tokens + navigation)
+- [x] Web UI shell: login, Overview, Channels, Quality, Sources, Devices (Prism tokens)
 - [ ] Coolify resources: Database + Application + domain + backup + Kuma
-- [ ] CI: ruff, mypy, pytest, docker build, Trivy, SBOM
+- [ ] CI: ruff, mypy, pytest, web build, docker build, Trivy, SBOM
 
 **Done when:** `https://iptv.joxit.ru` serves a login page over TLS, `/healthz` is green in Uptime
 Kuma, the database backup has been restored once, and CI is green on `main`.

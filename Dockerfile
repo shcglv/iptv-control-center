@@ -1,17 +1,30 @@
 # syntax=docker/dockerfile:1.7
 #
-# IPTV Control Center — API + delivery.
+# IPTV Control Center — API + web UI.
 #
 # Reproducibility rules (see docs/ARCHITECTURE.md §10):
-#   * the runtime base image is pinned by digest, not by tag,
-#   * dependencies install with --no-cache-dir into a non-root user's environment,
+#   * both base images are pinned by digest, not by tag,
+#   * dependencies install from a lockfile with --frozen-lockfile,
 #   * nothing is downloaded at container start,
 #   * the process runs as UID 10001 with no shell-level privileges.
 #
 # The image contains no video stack on purpose: this service never touches media bytes.
 
 ARG PYTHON_IMAGE=python:3.12-slim@sha256:191083cdf6c7bda8c76158983163ead5d5cf7b77cf3033e805bb0f5296f51b4b
+ARG NODE_IMAGE=node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
 
+# ---------------------------------------------------------------- web build
+FROM ${NODE_IMAGE} AS web
+
+WORKDIR /web
+RUN npm install -g pnpm@11.28.5
+COPY web/package.json web/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY web/ ./
+# Vite writes to ../src/iptvcc/static, i.e. /src/iptvcc/static inside this stage.
+RUN pnpm build
+
+# ---------------------------------------------------------------- runtime
 FROM ${PYTHON_IMAGE} AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
@@ -24,9 +37,9 @@ RUN groupadd --gid 10001 app \
 
 WORKDIR /app
 
-# Dependency layer first: rebuilds only when pyproject changes.
 COPY pyproject.toml README.md alembic.ini ./
 COPY src ./src
+COPY --from=web /src/iptvcc/static ./src/iptvcc/static
 COPY migrations ./migrations
 COPY scripts ./scripts
 RUN pip install --no-cache-dir . \

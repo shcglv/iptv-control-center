@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -254,14 +255,10 @@ async def healthz(session: SessionDep) -> HealthOut:
     )
 
 
-@app.get("/", include_in_schema=False)
-async def root() -> dict[str, str]:
-    return {
-        "name": "IPTV Control Center",
-        "version": __version__,
-        "docs": "/docs",
-        "health": "/healthz",
-    }
+STATIC_DIR = Path(__file__).parent / "static"
+
+if (STATIC_DIR / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 
 
 @app.post("/api/v1/sources", response_model=SourceOut, status_code=201, tags=["sources"])
@@ -1062,3 +1059,33 @@ async def _resolve_profile(session: AsyncSession, profile_id: int | None) -> Pla
         session.add(profile)
         await session.flush()
     return profile
+
+
+# --- frontend ----------------------------------------------------------------------------------
+#
+# Registered last on purpose: a catch-all declared earlier would shadow every API route above it.
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def frontend_or_info(full_path: str) -> Response:
+    """Serve the built SPA, falling back to an API description when no build is present."""
+    if full_path.startswith(("api/", "p/")) or full_path == "healthz":
+        raise HTTPException(status_code=404, detail="not found")
+
+    index = STATIC_DIR / "index.html"
+    if index.is_file():
+        if full_path:
+            candidate = (STATIC_DIR / full_path).resolve()
+            if candidate.is_file() and candidate.is_relative_to(STATIC_DIR.resolve()):
+                return FileResponse(candidate)
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
+
+    return JSONResponse(
+        {
+            "name": "IPTV Control Center",
+            "version": __version__,
+            "docs": "/docs",
+            "health": "/healthz",
+            "ui": "not built (run: cd web && pnpm build)",
+        }
+    )

@@ -32,3 +32,8 @@ data/
 Thumbs.db
 .idea/
 .vscode/
+
+# Web UI: source is committed, build output and dependencies are not
+web/node_modules/
+web/dist/
+src/iptvcc/static/

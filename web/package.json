@@ -1,0 +1,22 @@
+{
+  "name": "iptv-control-center-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "dev": "vite"
+  },
+  "dependencies": {
+    "react": ">=19",
+    "react-dom": ">=19"
+  },
+  "devDependencies": {
+    "@types/react": ">=19",
+    "@types/react-dom": ">=19",
+    "@vitejs/plugin-react": ">=4",
+    "typescript": ">=5.6",
+    "vite": ">=6"
+  }
+}

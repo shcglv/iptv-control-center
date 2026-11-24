@@ -63,7 +63,8 @@ Measured baselines on the host: postgres 15.9 MB RSS, comparable Python APIs 11�
 | `services/epg.py` | XMLTV ingest, channel mapping, per-device guide rendering |
 | `services/profiles.py` | effective lineup per playlist profile (visibility, order, pins) |
 | `services/delivery.py` | per-device playlist rendering, 302 resolver |
-| `api.py` | HTTP surface: admin API, `/p/...`, `/healthz` |
+| `api.py` | HTTP surface: admin API, `/p/...`, `/healthz`, SPA |
+| `web/` | React + TypeScript SPA (Vite), built into `src/iptvcc/static` |
 
 ## 5. Data model (current)
 
@@ -173,8 +174,26 @@ catalog number, so a new profile starts with the full lineup and no seeding of t
 The same resolution feeds both the playlist and the per-device XMLTV, so a hidden channel disappears
 from the playlist and from the guide together.
 
-## 7. Security
+## 6.5 Web UI
 
+React 19 + TypeScript built by Vite. The bundle is written into the Python package
+(`src/iptvcc/static`), so one container serves both the API and the UI — no second service, no CDN,
+no node runtime in production.
+
+| Concern | Decision |
+|---|---|
+| Build | `cd web && pnpm install && pnpm build` (Node stage in the Dockerfile) |
+| Serving | `/assets/*` is a static mount; every other non-API path returns `index.html` |
+| Route order | the SPA catch-all is registered **last**; declared earlier it shadows every API route |
+| Auth | cookie session; the CSRF token from login is kept in `sessionStorage` and sent as `X-CSRF-Token` |
+| API paths | `/api/...` and `/p/...` are explicitly excluded from the SPA fallback and stay JSON 404s |
+| Bundle size | 244 KB JS (75 KB gzip) + 6.9 KB CSS (2.1 KB gzip) |
+
+Screens: Overview (stats, attention, worst streams), Channels (search + pagination), Quality
+(probe scores and a manual check), Sources (create + import playlist), Devices (create, reveal token
+once, rotate). Login is password + TOTP.
+
+## 7. Security
 | Concern | Control |
 |---|---|
 | Admin surface | Argon2id password + TOTP, server-side sessions (opaque token, SHA-256 at rest, 12 h TTL), `HttpOnly`/`SameSite=Lax` cookie, CSRF header on every unsafe method, 5 attempts/min login guard |
@@ -193,8 +212,8 @@ No new infrastructure components. Builds run in Coolify; releases also publish a
 
 ## 9. What is not implemented yet
 
-Active probe mode (ffprobe) · quality UI and notifications · Playlist Studio drag-and-drop editor ·
-web UI · discovery/forum adapters · Telegram bot · CI pipeline · Coolify resources.
+Active probe mode (ffprobe) · notifications · Playlist Studio drag-and-drop editor · discovery/forum
+adapters · Telegram bot · CI pipeline · Coolify resources · browser-level UI tests.
 Tracked in `docs/ROADMAP.md`.
 
 ## 10. Reproducibility
