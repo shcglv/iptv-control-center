@@ -15,6 +15,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -234,6 +235,89 @@ class AppSetting(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
+
+
+# --- EPG ---------------------------------------------------------------------------------------
+#
+# Programme times are stored as UTC epoch seconds: unambiguous on both SQLite and PostgreSQL,
+# directly comparable in SQL, and trivial to format back to XMLTV's "+0000".
+
+
+class EpgSource(Base):
+    __tablename__ = "epg_source"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    url: Mapped[str] = mapped_column(Text, default="")
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    retention_days: Mapped[int] = mapped_column(Integer, default=3)
+
+    # Applied only when a programme has no explicit UTC offset.
+    default_timezone: Mapped[str] = mapped_column(String(64), default="UTC")
+
+    last_fetch_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status: Mapped[str | None] = mapped_column(String(32))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    channels: Mapped[list[EpgChannel]] = relationship(
+        back_populates="source", cascade="all, delete-orphan"
+    )
+
+
+class EpgChannel(Base):
+    __tablename__ = "epg_channel"
+    __table_args__ = (
+        UniqueConstraint("epg_source_id", "source_tvg_id", name="uq_epg_channel_source_tvg"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    epg_source_id: Mapped[int] = mapped_column(
+        ForeignKey("epg_source.id", ondelete="CASCADE"), index=True
+    )
+    source_tvg_id: Mapped[str] = mapped_column(String(255), index=True)
+    display_name: Mapped[str] = mapped_column(String(255), default="")
+    icon_url: Mapped[str | None] = mapped_column(Text)
+
+    source: Mapped[EpgSource] = relationship(back_populates="channels")
+    programmes: Mapped[list[Programme]] = relationship(
+        back_populates="channel", cascade="all, delete-orphan"
+    )
+
+
+class Programme(Base):
+    __tablename__ = "programme"
+    __table_args__ = (Index("ix_programme_channel_start", "epg_channel_id", "start_epoch"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    epg_channel_id: Mapped[int] = mapped_column(
+        ForeignKey("epg_channel.id", ondelete="CASCADE"), index=True
+    )
+    start_epoch: Mapped[int] = mapped_column(Integer)
+    stop_epoch: Mapped[int | None] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(512), default="")
+    subtitle: Mapped[str | None] = mapped_column(String(512))
+    description: Mapped[str | None] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(String(128))
+
+    channel: Mapped[EpgChannel] = relationship(back_populates="programmes")
+
+
+class ChannelEpgMap(Base):
+    __tablename__ = "channel_epg_map"
+
+    channel_id: Mapped[str] = mapped_column(
+        ForeignKey("channel.id", ondelete="CASCADE"), primary_key=True
+    )
+    epg_channel_id: Mapped[int] = mapped_column(
+        ForeignKey("epg_channel.id", ondelete="CASCADE"), index=True
+    )
+    method: Mapped[str] = mapped_column(String(24), default="tvg_id")
+    confidence: Mapped[float] = mapped_column(default=1.0)
+    is_manual: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    epg_channel: Mapped[EpgChannel] = relationship()
 
 
 # --- admin identity ----------------------------------------------------------------------------

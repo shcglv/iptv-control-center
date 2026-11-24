@@ -22,6 +22,9 @@ class Settings(BaseSettings):
 
     display_timezone: str = "Europe/Moscow"
 
+    # Rendered playlists/guides and other generated files.
+    artifacts_dir: str = "./data/artifacts"
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() in {"production", "prod"}

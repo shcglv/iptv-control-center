@@ -56,6 +56,7 @@ Measured baselines on the host: postgres 15.9 MB RSS, comparable Python APIs 11�
 | `netguard.py` | SSRF guard for any user-supplied URL (scheme, resolve, redirects, size) |
 | `security.py` | device tokens (hashed), public keys, constant-time compare |
 | `services/importing.py` | parse → upsert streams → attach to channels (idempotent) |
+| `services/epg.py` | XMLTV ingest, channel mapping, per-device guide rendering |
 | `services/delivery.py` | per-device playlist rendering, 302 resolver |
 | `api.py` | HTTP surface: admin API, `/p/...`, `/healthz` |
 
@@ -95,6 +96,22 @@ stream of that container exists. `HEAD` answers `200` locally without touching t
 - provider credentials are visible to the device in the `Location` header;
 - a source that requires a specific `User-Agent`/`Referer` cannot be served through a 302.
 
+### EPG
+
+Ingestion streams the XMLTV file with `iterparse` and inserts in batches, so memory is flat.
+Programmes are stored as UTC epoch seconds — unambiguous on SQLite and PostgreSQL.
+
+- A source is **fully replaced** on every import (programmes are deleted, then re-inserted), which
+  makes re-import idempotent and applies retention in the same pass.
+- `DOCTYPE` declarations are refused: XMLTV never needs them, and they are the entity-expansion
+  attack surface.
+- Channel mapping: exact `tvg_id` first, then normalised display name. Manual mappings
+  (`channel_epg_map.is_manual`) are never overwritten by an import.
+- The playlist emits the **mapped** guide id, so `tvg-id` in the M3U and `<channel id>` in the
+  XMLTV always agree — the join every player depends on.
+- `GET /p/<token>/epg.xml` and `.xml.gz` render the device's own channel subset, cached for 5
+  minutes on disk keyed by a hash of the token (the token itself never appears in a filename).
+
 ## 7. Security
 
 | Concern | Control |
@@ -115,8 +132,8 @@ No new infrastructure components. Builds run in Coolify; releases also publish a
 
 ## 9. What is not implemented yet
 
-EPG ingest and rendering · quality engine · playlist-profile channel filtering · Playlist Studio ·
-web UI · discovery/forum adapters · Telegram bot · notifications · CI pipeline · Coolify resources.
+Quality engine · playlist-profile channel filtering · Playlist Studio · web UI · discovery/forum
+adapters · Telegram bot · notifications · CI pipeline · Coolify resources.
 Tracked in `docs/ROADMAP.md`.
 
 ## 10. Reproducibility

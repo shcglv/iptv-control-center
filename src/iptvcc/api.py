@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,15 +34,26 @@ from .models import (
     AdminUser,
     Assignment,
     Channel,
+    ChannelEpgMap,
     ChannelStream,
     Device,
+    EpgChannel,
+    EpgSource,
     PlaylistProfile,
+    Programme,
     Source,
 )
 from .netguard import UnsafeUrlError, fetch_text
 from .secrets import mask_url
 from .security import generate_device_token, hash_token, token_prefix
 from .services.delivery import build_playlist, get_active_assignment, resolve_stream
+from .services.epg import (
+    XmltvError,
+    build_guide,
+    guide_cache_key,
+    ingest_xmltv,
+    map_channels,
+)
 from .services.importing import ImportStats, import_playlist
 
 logger = logging.getLogger(__name__)
@@ -387,6 +400,159 @@ async def rotate_token(device_id: str, session: SessionDep, _: AdminDep) -> Devi
     return DeviceWithToken(**out.model_dump(), token=token)
 
 
+# --- EPG ---------------------------------------------------------------------------------------
+
+
+class EpgSourceCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    url: str = ""
+    priority: int = 0
+    retention_days: int = Field(default=3, ge=0, le=30)
+    default_timezone: str = "UTC"
+
+
+class EpgSourceOut(BaseModel):
+    id: int
+    name: str
+    url_masked: str
+    priority: int
+    enabled: bool
+    retention_days: int
+    last_status: str | None
+    last_fetch_at: datetime | None
+    channels: int
+
+
+class EpgImportRequest(BaseModel):
+    xml: str | None = None
+    url: str | None = None
+
+
+class EpgImportResponse(BaseModel):
+    source_id: int
+    stats: dict[str, int]
+
+
+class EpgStatusOut(BaseModel):
+    sources: int
+    epg_channels: int
+    programmes: int
+    mapped_channels: int
+    unmapped_channels: int
+
+
+@app.post("/api/v1/epg/sources", response_model=EpgSourceOut, status_code=201, tags=["epg"])
+async def create_epg_source(
+    payload: EpgSourceCreate, session: SessionDep, _: AdminDep
+) -> EpgSourceOut:
+    existing = await session.scalar(select(EpgSource).where(EpgSource.name == payload.name))
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="EPG source name already exists")
+    source = EpgSource(
+        name=payload.name,
+        url=payload.url,
+        priority=payload.priority,
+        retention_days=payload.retention_days,
+        default_timezone=payload.default_timezone,
+    )
+    session.add(source)
+    await session.flush()
+    return _epg_source_out(source, 0)
+
+
+@app.get("/api/v1/epg/sources", response_model=list[EpgSourceOut], tags=["epg"])
+async def list_epg_sources(session: SessionDep, _: AdminDep) -> list[EpgSourceOut]:
+    sources = (await session.scalars(select(EpgSource).order_by(EpgSource.id))).all()
+    counts = dict(
+        (
+            await session.execute(
+                select(EpgChannel.epg_source_id, func.count()).group_by(EpgChannel.epg_source_id)
+            )
+        ).all()
+    )
+    return [_epg_source_out(source, counts.get(source.id, 0)) for source in sources]
+
+
+@app.post("/api/v1/epg/sources/{source_id}/import", response_model=EpgImportResponse, tags=["epg"])
+async def import_epg(
+    source_id: int, payload: EpgImportRequest, session: SessionDep, _: AdminDep
+) -> EpgImportResponse:
+    source = await session.get(EpgSource, source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="EPG source not found")
+    if not payload.xml and not payload.url:
+        raise HTTPException(status_code=422, detail="provide either 'xml' or 'url'")
+
+    try:
+        if payload.xml:
+            data = payload.xml.encode("utf-8")
+        else:
+            data = (await fetch_text(payload.url or "")).encode("utf-8")
+        stats = await ingest_xmltv(session, source, data)
+    except XmltvError as exc:
+        source.last_status = "error"
+        source.last_error = str(exc)
+        raise HTTPException(status_code=422, detail=f"EPG import failed: {exc}") from exc
+    except UnsafeUrlError as exc:
+        source.last_status = "error"
+        source.last_error = str(exc)
+        raise HTTPException(status_code=502, detail=f"EPG import failed: {exc}") from exc
+
+    return EpgImportResponse(source_id=source.id, stats=stats.as_dict())
+
+
+@app.post("/api/v1/epg/map", tags=["epg"])
+async def remap_epg(session: SessionDep, _: AdminDep) -> dict[str, int]:
+    return {"mapped": await map_channels(session)}
+
+
+@app.get("/api/v1/epg/status", response_model=EpgStatusOut, tags=["epg"])
+async def epg_status(session: SessionDep, _: AdminDep) -> EpgStatusOut:
+    sources = await session.scalar(select(func.count()).select_from(EpgSource)) or 0
+    epg_channels = await session.scalar(select(func.count()).select_from(EpgChannel)) or 0
+    programmes = await session.scalar(select(func.count()).select_from(Programme)) or 0
+    mapped = await session.scalar(select(func.count()).select_from(ChannelEpgMap)) or 0
+    total_channels = await session.scalar(select(func.count()).select_from(Channel)) or 0
+    return EpgStatusOut(
+        sources=sources,
+        epg_channels=epg_channels,
+        programmes=programmes,
+        mapped_channels=mapped,
+        unmapped_channels=max(0, total_channels - mapped),
+    )
+
+
+@app.get("/p/{token}/epg.xml", tags=["delivery"])
+async def device_epg(token: str, session: SessionDep) -> FileResponse:
+    return await _serve_epg(token, session, gzipped=False)
+
+
+@app.get("/p/{token}/epg.xml.gz", tags=["delivery"])
+async def device_epg_gzip(token: str, session: SessionDep) -> FileResponse:
+    return await _serve_epg(token, session, gzipped=True)
+
+
+async def _serve_epg(token: str, session: AsyncSession, *, gzipped: bool) -> FileResponse:
+    out_dir = Path(get_settings().artifacts_dir) / "epg"
+    key = guide_cache_key(token)
+    xml_path = out_dir / f"{key}.xml"
+    gz_path = out_dir / f"{key}.xml.gz"
+
+    fresh = xml_path.exists() and (time.time() - xml_path.stat().st_mtime) < 300
+    if not fresh:
+        rendered = await build_guide(session, token, out_dir)
+        if rendered is None:
+            raise HTTPException(status_code=404, detail="unknown or revoked token")
+        xml_path, gz_path = rendered
+
+    path = gz_path if gzipped else xml_path
+    return FileResponse(
+        path,
+        media_type="application/gzip" if gzipped else "application/xml",
+        headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"},
+    )
+
+
 # --- delivery ----------------------------------------------------------------------------------
 
 
@@ -440,6 +606,20 @@ def _source_out(source: Source) -> SourceOut:
         last_status=source.last_status,
         last_import_at=source.last_import_at,
         url_masked=mask_url(source.url) if source.url else "",
+    )
+
+
+def _epg_source_out(source: EpgSource, channels: int) -> EpgSourceOut:
+    return EpgSourceOut(
+        id=source.id,
+        name=source.name,
+        url_masked=mask_url(source.url) if source.url else "",
+        priority=source.priority,
+        enabled=source.enabled,
+        retention_days=source.retention_days,
+        last_status=source.last_status,
+        last_fetch_at=source.last_fetch_at,
+        channels=channels,
     )
 
 

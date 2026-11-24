@@ -11,6 +11,7 @@ os.environ["IPTV_ADMIN_API_KEY"] = "test-admin"
 os.environ["IPTV_ENCRYPTION_KEY"] = base64.b64encode(b"k" * 32).decode()
 os.environ["IPTV_DATABASE_URL"] = "sqlite+aiosqlite:///./data/pytest-unused.db"
 os.environ["IPTV_PUBLIC_BASE_URL"] = "http://test"
+os.environ["IPTV_ARTIFACTS_DIR"] = "./data/test-artifacts"
 
 from collections.abc import AsyncIterator
 

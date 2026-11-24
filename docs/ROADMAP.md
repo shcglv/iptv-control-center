@@ -65,10 +65,16 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 
 Drag & drop editor, impact panel, M3U/EPG preview.
 
-## P5 — EPG — `[ ]`
+## P5 — EPG — `[~]`
 
-Sources, streaming ingest (`lxml.iterparse`), mapping, retention, per-client rendering
-(plain / gzip / smart-TV ≤ 5 MB), management + TV guide views.
+- [x] XMLTV sources (`epg_source`), streaming ingest with `lxml.iterparse`, batched inserts
+- [x] UTC epoch storage, offset parsing, per-source default timezone
+- [x] Retention and idempotent full replace per source
+- [x] Channel mapping: exact `tvg_id` → normalised name; manual maps preserved
+- [x] Per-device `epg.xml` / `epg.xml.gz`, mapped ids emitted in the playlist
+- [ ] Smart-TV size cap (≤ 5 MB) and profile-aware window
+- [ ] EPG management view + TV guide view in the UI
+- [ ] `iptv-org/epg` sidecar (optional, licence caveat)
 
 ## P6 — Health and quality — `[ ]`
 

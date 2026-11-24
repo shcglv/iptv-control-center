@@ -13,7 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..m3u import CONTAINER_DASH, CONTAINER_HLS, CONTAINER_TS, RenderedChannel, render_m3u
-from ..models import ROLE_DISABLED, Assignment, Channel, ChannelStream, PlaylistProfile, Stream
+from ..models import (
+    ROLE_DISABLED,
+    Assignment,
+    Channel,
+    ChannelEpgMap,
+    ChannelStream,
+    EpgChannel,
+    PlaylistProfile,
+    Stream,
+)
 from ..secrets import decrypt
 from ..security import hash_token
 
@@ -101,6 +110,15 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
     ).all()
 
     rendered: list[RenderedChannel] = []
+    xmltv_ids = dict(
+        (
+            await session.execute(
+                select(ChannelEpgMap.channel_id, EpgChannel.source_tvg_id).join(
+                    EpgChannel, EpgChannel.id == ChannelEpgMap.epg_channel_id
+                )
+            )
+        ).all()
+    )
     for channel in channels:
         best = _primary_stream(channel)
         if best is None:
@@ -109,7 +127,12 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
             RenderedChannel(
                 public_key=channel.public_key,
                 display_name=channel.display_name,
-                epg_id=channel.epg_id or channel.tvg_id or channel.public_key,
+                epg_id=(
+                    xmltv_ids.get(channel.id)
+                    or channel.epg_id
+                    or channel.tvg_id
+                    or channel.public_key
+                ),
                 logo_url=channel.logo_url,
                 number=channel.number,
                 group=channel.category.name if channel.category else None,
