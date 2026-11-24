@@ -250,7 +250,7 @@ FEED = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 class _FeedHandler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         body = FEED.encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/rss+xml")
