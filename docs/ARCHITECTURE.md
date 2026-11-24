@@ -63,6 +63,7 @@ Measured baselines on the host: postgres 15.9 MB RSS, comparable Python APIs 11�
 | `services/epg.py` | XMLTV ingest, channel mapping, per-device guide rendering |
 | `services/profiles.py` | effective lineup per playlist profile (visibility, order, pins) |
 | `services/delivery.py` | per-device playlist rendering, 302 resolver |
+| `telegram/` | Bot API adapter, long-polling bot, notification scan |
 | `api.py` | HTTP surface: admin API, `/p/...`, `/healthz`, SPA |
 | `web/` | React + TypeScript SPA (Vite), built into `src/iptvcc/static` |
 
@@ -203,7 +204,25 @@ $env:IPTV_BROWSER_TESTS = "1"
 .\.venv\Scripts\python.exe -m pytest tests/test_browser.py -q
 ```
 
+## 6.6 Telegram
+
+Long polling, so no inbound port, no webhook and no public route are needed. The bot starts with the
+API when `IPTV_TELEGRAM_BOT_TOKEN` is set and stops with it.
+
+| Concern | Decision |
+|---|---|
+| API isolation | only `telegram/client.py` knows HTTP, method names and the token; `base_url` is a setting so tests and a self-hosted Bot API server work unchanged |
+| Proxy | explicit `IPTV_TELEGRAM_PROXY` only; `trust_env=False`, because ambient `HTTP_PROXY` broke localhost in this environment |
+| Access | allowlist in `telegram_user`; the first message from `IPTV_TELEGRAM_OWNER_ID` bootstraps it |
+| Commands | `/start /help /status /channels /sources /problems /devices /subscriptions /report /check` — all read-only except `/check`, which runs one probe round |
+| Notifications | scan every 5 min: source errors, subscription expiry ≤ 7 days, scheduler silent or failing, channels without EPG |
+| Dedupe | stable key per problem, at most one alert per 6 h, one recovery message when it clears, per-chat mute honoured |
+
+Verified against a fake Bot API: 19 unit/integration tests plus a live run that registers the
+commands, polls, and delivers `🟡 Планировщик проверок ещё не запускался` to the allowlisted chat.
+
 ## 7. Security
+
 | Concern | Control |
 |---|---|
 | Admin surface | Argon2id password + TOTP, server-side sessions (opaque token, SHA-256 at rest, 12 h TTL), `HttpOnly`/`SameSite=Lax` cookie, CSRF header on every unsafe method, 5 attempts/min login guard |
@@ -222,8 +241,8 @@ No new infrastructure components. Builds run in Coolify; releases also publish a
 
 ## 9. What is not implemented yet
 
-Active probe mode (ffprobe) · notifications · Playlist Studio drag-and-drop · discovery/forum
-adapters · Telegram bot · CI pipeline · Coolify resources.
+Active probe mode (ffprobe) · Playlist Studio drag-and-drop · discovery/forum adapters ·
+Telegram rich messages/widgets · CI pipeline · Coolify resources.
 Tracked in `docs/ROADMAP.md`.
 
 ## 10. Reproducibility

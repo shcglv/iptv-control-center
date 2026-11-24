@@ -193,7 +193,9 @@ async def test_resolver_rejects_unknown_token(client: httpx.AsyncClient) -> None
 async def test_channel_sources_endpoint(client: httpx.AsyncClient) -> None:
     source = (
         await client.post(
-            "/api/v1/sources", json={"name": "Src", "url": "http://p.test/l.m3u"}, headers=ADMIN_HEADERS
+            "/api/v1/sources",
+            json={"name": "Src", "url": "http://p.test/l.m3u"},
+            headers=ADMIN_HEADERS,
         )
     ).json()
     await client.post(

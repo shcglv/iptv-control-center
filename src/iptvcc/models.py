@@ -85,6 +85,7 @@ class Source(Base):
     last_import_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_status: Mapped[str | None] = mapped_column(String(32))
     last_error: Mapped[str | None] = mapped_column(Text)
+    subscription_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -453,3 +454,34 @@ class AdminSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ip: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(300))
+
+
+# --- telegram ----------------------------------------------------------------------------------
+
+
+class TelegramUser(Base):
+    """Allowlist of chats allowed to talk to the bot."""
+
+    __tablename__ = "telegram_user"
+
+    telegram_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str | None] = mapped_column(String(64))
+    role: Mapped[str] = mapped_column(String(16), default="owner")
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    muted_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Notification(Base):
+    """Delivery log and dedupe source for push notifications."""
+
+    __tablename__ = "notification"
+    __table_args__ = (Index("ix_notification_key_time", "dedupe_key", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), default="problem")
+    severity: Mapped[str] = mapped_column(String(16), default="warning")
+    dedupe_key: Mapped[str] = mapped_column(String(120))
+    text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error: Mapped[str | None] = mapped_column(Text)

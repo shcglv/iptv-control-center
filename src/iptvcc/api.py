@@ -67,6 +67,7 @@ from .services.importing import ImportStats, import_playlist
 from .services.profiles import load_channel_overrides, visible_channels
 from .services.scheduler import ProbeScheduler, scheduler_status
 from .services.selector import rank_candidates
+from .telegram import TelegramBot, TelegramClient
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +88,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         scheduler = ProbeScheduler(factory)
         scheduler.start()
         app.state.scheduler = scheduler
+
+    telegram_bot: TelegramBot | None = None
+    if settings.telegram_enabled and settings.telegram_bot_token:
+        telegram_client = TelegramClient(
+            settings.telegram_bot_token,
+            base_url=settings.telegram_api_base,
+            proxy=settings.telegram_proxy,
+        )
+        telegram_bot = TelegramBot(telegram_client, get_session_factory())
+        telegram_bot.start()
+        app.state.telegram_bot = telegram_bot
+
     try:
         yield
     finally:
+        if telegram_bot is not None:
+            await telegram_bot.stop()
         if scheduler is not None:
             await scheduler.stop()
         await dispose_engine()
@@ -173,6 +188,7 @@ class SourceCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     url: str = ""
     type: Literal["m3u", "xtream", "manual", "rest"] = "m3u"
+    subscription_expires_at: datetime | None = None
 
 
 class SourceOut(BaseModel):
@@ -185,6 +201,7 @@ class SourceOut(BaseModel):
     stream_count: int
     last_status: str | None
     last_import_at: datetime | None
+    subscription_expires_at: datetime | None
     url_masked: str
 
 
@@ -276,7 +293,12 @@ async def create_source(payload: SourceCreate, session: SessionDep, _: AdminDep)
     existing = await session.scalar(select(Source).where(Source.name == payload.name))
     if existing is not None:
         raise HTTPException(status_code=409, detail="source name already exists")
-    source = Source(name=payload.name, type=payload.type, url=payload.url)
+    source = Source(
+        name=payload.name,
+        type=payload.type,
+        url=payload.url,
+        subscription_expires_at=payload.subscription_expires_at,
+    )
     session.add(source)
     await session.flush()
     return _source_out(source)
@@ -412,6 +434,7 @@ async def channel_sources(
 
 
 # --- devices -----------------------------------------------------------------------------------
+
 
 @app.post("/api/v1/devices", response_model=DeviceWithToken, status_code=201, tags=["devices"])
 async def create_device(payload: DeviceCreate, session: SessionDep, _: AdminDep) -> DeviceWithToken:
@@ -1074,6 +1097,7 @@ def _source_out(source: Source) -> SourceOut:
         stream_count=source.stream_count,
         last_status=source.last_status,
         last_import_at=source.last_import_at,
+        subscription_expires_at=source.subscription_expires_at,
         url_masked=mask_url(source.url) if source.url else "",
     )
 

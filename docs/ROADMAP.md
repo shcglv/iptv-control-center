@@ -96,10 +96,14 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 
 iptv-org seeding + blocklist, forum adapter framework, extractors, Candidate Store, review UI.
 
-## P8 — Telegram — `[ ]`
+## P8 — Telegram — `[~]`
 
-Bot API 10.5 compatibility layer, 16 commands, 18 templates, lifecycle/idempotency, notifications,
-daily report, optional widgets/topics.
+- [x] Bot API adapter (isolated, configurable base URL, explicit proxy only)
+- [x] Long polling, allowlist with owner bootstrap, `/start /help /status /channels /sources /problems /devices /subscriptions /report /check`
+- [x] Notification scan: source errors, subscription expiry, scheduler silent/failing, EPG missing
+- [x] Dedupe window, recovery messages, per-chat mute
+- [ ] Rich messages / widgets / topics (Bot API 10.x extras)
+- [ ] Daily scheduled report at a fixed local time
 
 ## P9 — Hardening — `[ ]`
 

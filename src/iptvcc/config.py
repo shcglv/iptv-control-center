@@ -34,6 +34,16 @@ class Settings(BaseSettings):
     scheduler_hot_interval_seconds: int = 300
     scheduler_cold_interval_seconds: int = 3600
 
+    # Telegram bot. Without a token the bot is disabled; polling needs no inbound port.
+    telegram_bot_token: str = ""
+    telegram_enabled: bool = True
+    telegram_owner_id: int | None = None
+    telegram_poll_timeout: int = 25
+    telegram_proxy: str = ""
+    telegram_api_base: str = "https://api.telegram.org"
+    telegram_notify_interval_seconds: int = 300
+    telegram_dedupe_hours: int = 6
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() in {"production", "prod"}
