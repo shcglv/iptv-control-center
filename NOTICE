@@ -1,0 +1,36 @@
+IPTV Control Center
+Copyright (C) 2026 shcgl
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU Affero General Public License as published by the Free Software Foundation, version 3 of
+the License only.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU Affero General Public License for more details: see the LICENSE file.
+
+Because this program is a network service, section 13 of the AGPL applies: users interacting
+with it over a network are offered the Corresponding Source. The source is this repository.
+
+---
+
+Third-party attribution
+=======================
+
+Dispatcharr — https://github.com/Dispatcharr/Dispatcharr — AGPL-3.0-only
+    The architecture of this project was informed by Dispatcharr's design: per-field channel
+    overrides, hash-based stream identity, and its EPG matching approach (rapidfuzz ratio plus a
+    regional bonus). No Dispatcharr source file has been copied into this repository yet.
+    When a fragment is ported, the file carrying it gets a header naming the upstream path and
+    commit, and this NOTICE is updated with the exact list.
+
+iptv-org/database, iptv-org/iptv — Unlicense (public domain)
+    Planned as seed data for channel identity, logos and country/language metadata.
+    No data from these repositories is bundled in this repository.
+
+iptv-org/epg — LICENSE file says Unlicense, package.json says "UNLICENSED"
+    Not used as code. If an EPG grabber is ever integrated, it runs as an unmodified external
+    process in its own container; its code is never vendored here.
+
+Apple, macOS, iOS, tvOS and Telegram are trademarks of their respective owners. This project is
+not affiliated with or endorsed by any of them.

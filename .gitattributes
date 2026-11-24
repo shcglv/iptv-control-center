@@ -1,0 +1,19 @@
+# Normalise line endings so shell/config files stay usable inside the image and on the
+# server regardless of the contributor's operating system.
+* text=auto eol=lf
+
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.toml text eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.gz binary
+*.tar binary
+*.woff2 binary
