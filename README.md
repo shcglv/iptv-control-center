@@ -5,8 +5,8 @@ per-device playlists. **Video never transits the server** — playlists point at
 server's only role in playback is an optional HTTP 302 that picks the best source at request time.
 
 > **Status: `0.1.0` — vertical slice.** Working: M3U import → channel catalog → per-device playlist →
-> 302 source resolution. Not yet: admin login (TOTP), EPG, quality engine, discovery, Telegram, web UI.
-> See `docs/ROADMAP.md` for the phase plan.
+> 302 source resolution, plus admin login with TOTP and Alembic migrations. Not yet: EPG, quality
+> engine, discovery, Telegram, web UI. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## What it does today
 
@@ -17,13 +17,15 @@ device /p/<token>/live.m3u ◄── render (deterministic) ─┘
 device /p/<token>/s/<key>.ts ──► 302 Location: provider URL ──► player ◄── video (direct)
 ```
 
-- **Import** — streamed M3U/M3U8 parsing, attribute handling (`tvg-id`, `tvg-name`, `tvg-logo`,
-  `group-title`, `#EXTGRP`, `#EXTVLCOPT`), stable stream hashes, idempotent re-import.
-- **Catalog** — one channel per real channel, many streams per channel, permanent UUID + short public key.
-- **Delivery** — deterministic per-device M3U with all three EPG attributes, and a resolver that
-  returns `302` to the selected provider URL without touching media bytes.
-- **Security** — AES-256-GCM at rest for provider URLs, opaque device tokens stored as SHA-256,
-  instant revocation, admin gate.
+- **Import** — tolerant M3U/M3U8 parser (`tvg-*`, `group-title`, `#EXTGRP`, `#EXTVLCOPT`), stable
+  stream hashes, idempotent re-import, stale marking instead of deletion.
+- **Catalog** — one channel per real channel, many streams per channel, permanent UUID + short
+  public key used in URLs.
+- **Delivery** — deterministic per-device M3U with `url-tvg`, `x-tvg-url` and `tvg-url`; a resolver
+  that redirects inside the requested container only, and answers `HEAD` locally.
+- **Security** — Argon2id passwords, TOTP second factor, server-side sessions, CSRF on unsafe
+  methods, AES-256-GCM at rest for provider URLs, SHA-256 device tokens with rotation/revocation,
+  SSRF guard on imports.
 
 ## Quick start (local, SQLite)
 
@@ -31,54 +33,78 @@ device /p/<token>/s/<key>.ts ──► 302 Location: provider URL ──► play
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 
-$env:IPTV_ENCRYPTION_KEY = (python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())")
-.\.venv\Scripts\python.exe -m iptvcc        # http://127.0.0.1:8000
+# 32-byte key for encryption at rest
+$env:IPTV_ENCRYPTION_KEY = (& .\.venv\Scripts\python.exe -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())")
+$env:IPTV_PUBLIC_BASE_URL = "http://127.0.0.1:8000"
+
+# schema + first admin (prints the TOTP secret and otpauth:// URI once)
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m iptvcc.cli create-admin --email admin@local
+
+# serve
+.\.venv\Scripts\python.exe -m iptvcc
 ```
 
-Then:
+### Use it
 
 ```powershell
-# 1. create a source
-Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/sources `
-  -Headers @{ 'X-Admin-Token' = 'dev-admin-key-change-me' } `
-  -ContentType application/json `
-  -Body '{"name":"Demo","url":"http://example.test/list.m3u"}'
+# login (returns a CSRF token; the session lives in an HttpOnly cookie)
+$body = '{"email":"admin@local","password":"<password>","totp":"<code>"}'
+$login = Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/auth/login `
+  -ContentType application/json -Body $body -SessionVariable web
+$csrf = $login.csrf_token
+$h = @{ 'X-CSRF-Token' = $csrf }
 
-# 2. import playlist text (file content)
-Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/sources/1/import `
-  -Headers @{ 'X-Admin-Token' = 'dev-admin-key-change-me' } `
-  -ContentType application/json `
-  -Body (@{ m3u = "#EXTM3U`n#EXTINF:-1 tvg-id=`"bbc1.uk`" tvg-logo=`"http://l/1.png`" group-title=`"News`",BBC One`nhttp://prov/1.ts" } | ConvertTo-Json)
+# add a source and import a playlist body
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/sources -WebSession $web -Headers $h `
+  -ContentType application/json -Body '{"name":"Demo","url":"http://example.test/list.m3u"}'
 
-# 3. create a device, get its token once
-Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/devices `
-  -Headers @{ 'X-Admin-Token' = 'dev-admin-key-change-me' } `
+$m3u = "#EXTM3U`n#EXTINF:-1 tvg-id=`"bbc1.uk`",BBC One`nhttp://provider.test/1.ts"
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/sources/1/import -WebSession $web -Headers $h `
+  -ContentType application/json -Body (@{ m3u = $m3u } | ConvertTo-Json)
+
+# create a device; the token is returned exactly once
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/devices -WebSession $web -Headers $h `
   -ContentType application/json -Body '{"name":"Living Room","kind":"android_tv"}'
-
-# 4. fetch the playlist
-Invoke-WebRequest http://127.0.0.1:8000/p/<token>/live.m3u
 ```
+
+Then point OwnTV or VLC at `http://127.0.0.1:8000/p/<token>/live.m3u`.
 
 ## Layout
 
 ```
 src/iptvcc/          application package
-  config.py          settings (env, .env)
+  config.py          settings (IPTV_* environment)
   db.py              async engine + session
   models.py          SQLAlchemy 2.0 models
-  secrets.py         AES-256-GCM at-rest encryption
+  auth.py            sessions, CSRF, login dependency
+  passwords.py       Argon2id hashing
+  totp.py            RFC 6238 helpers
+  secrets.py         AES-256-GCM at rest, URL masking
   m3u.py             parser + deterministic renderer
-  matching.py        normalisation + channel matching
-  services/          import, delivery, catalog
+  matching.py        normalisation + fuzzy scoring
+  netguard.py        SSRF guard
+  cli.py             create-admin
   api.py             FastAPI app and routes
-tests/               pytest (parser, matching, API, resolver)
+migrations/          Alembic (initial schema)
+scripts/start.sh     container entrypoint: migrate, then serve
+tests/               pytest
 docs/                architecture, roadmap, decisions
+```
+
+## Quality gates
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff check src tests
+.\.venv\Scripts\python.exe -m mypy src
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
 ## Non-goals (by design)
 
 No transcoding, no relay, no media proxying in the default architecture. A 302 response is not a
-proxy: it carries no media bytes. See `docs/ARCHITECTURE.md`.
+proxy: it carries no media bytes. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
+[ADR-0001](docs/decisions/0001-direct-streaming.md).
 
 ## License
 

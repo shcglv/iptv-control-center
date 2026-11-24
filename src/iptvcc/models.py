@@ -234,3 +234,34 @@ class AppSetting(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
+
+
+# --- admin identity ----------------------------------------------------------------------------
+
+
+class AdminUser(Base):
+    __tablename__ = "admin_user"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    totp_secret_enc: Mapped[str] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AdminSession(Base):
+    __tablename__ = "admin_session"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_user.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    csrf_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ip: Mapped[str | None] = mapped_column(String(64))
+    user_agent: Mapped[str | None] = mapped_column(String(300))

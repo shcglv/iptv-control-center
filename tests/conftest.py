@@ -1,4 +1,4 @@
-"""Shared pytest fixtures: isolated database, app client, seeded data."""
+"""Shared pytest fixtures: isolated database, authenticated client, anonymous client."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ os.environ["IPTV_PUBLIC_BASE_URL"] = "http://test"
 from collections.abc import AsyncIterator
 
 import httpx
+import pyotp
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -23,9 +24,15 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from iptvcc.api import app
+from iptvcc.auth import create_admin_user, reset_login_rate_limit
 from iptvcc.db import Base, get_session
 
-ADMIN_HEADERS = {"X-Admin-Token": "test-admin"}
+TEST_ADMIN_EMAIL = "admin@test.local"
+TEST_ADMIN_PASSWORD = "correct-horse-battery"
+TEST_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+
+# Mutated by the ``client`` fixture so tests can pass ``headers=ADMIN_HEADERS``.
+ADMIN_HEADERS: dict[str, str] = {}
 
 SAMPLE_M3U = """#EXTM3U url-tvg="http://epg.test/guide.xml"
 #EXTINF:-1 tvg-id="bbc1.uk" tvg-name="BBC One" tvg-logo="http://logo.test/bbc1.png" group-title="News",BBC One HD
@@ -51,12 +58,9 @@ async def session_factory(tmp_path) -> AsyncIterator[async_sessionmaker[AsyncSes
         await engine.dispose()
 
 
-@pytest_asyncio.fixture
-async def client(
-    session_factory: async_sessionmaker[AsyncSession],
-) -> AsyncIterator[httpx.AsyncClient]:
+def _bind_session(factory: async_sessionmaker[AsyncSession]) -> None:
     async def override_session() -> AsyncIterator[AsyncSession]:
-        async with session_factory() as session:
+        async with factory() as session:
             try:
                 yield session
                 await session.commit()
@@ -65,7 +69,54 @@ async def client(
                 raise
 
     app.dependency_overrides[get_session] = override_session
+
+
+@pytest_asyncio.fixture
+async def anon_client(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[httpx.AsyncClient]:
+    """Unauthenticated client (no cookie, no CSRF token)."""
+    _bind_session(session_factory)
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as http_client:
-        yield http_client
-    app.dependency_overrides.clear()
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as http_client:
+            yield http_client
+    finally:
+        app.dependency_overrides.pop(get_session, None)
+
+
+@pytest_asyncio.fixture
+async def client(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[httpx.AsyncClient]:
+    """Authenticated client: an admin exists, is logged in, and CSRF is set."""
+    reset_login_rate_limit()
+    async with session_factory() as session:
+        await create_admin_user(
+            session,
+            email=TEST_ADMIN_EMAIL,
+            password=TEST_ADMIN_PASSWORD,
+            totp_secret=TEST_TOTP_SECRET,
+        )
+        await session.commit()
+
+    _bind_session(session_factory)
+    transport = httpx.ASGITransport(app=app)
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as http_client:
+            code = pyotp.TOTP(TEST_TOTP_SECRET).now()
+            response = await http_client.post(
+                "/api/v1/auth/login",
+                json={
+                    "email": TEST_ADMIN_EMAIL,
+                    "password": TEST_ADMIN_PASSWORD,
+                    "totp": code,
+                },
+            )
+            assert response.status_code == 200, response.text
+            ADMIN_HEADERS.clear()
+            ADMIN_HEADERS["X-CSRF-Token"] = response.json()["csrf_token"]
+            yield http_client
+    finally:
+        ADMIN_HEADERS.clear()
+        app.dependency_overrides.pop(get_session, None)

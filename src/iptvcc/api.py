@@ -8,20 +8,38 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import PlainTextResponse, RedirectResponse, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from . import __version__
+from .auth import (
+    SESSION_COOKIE,
+    SESSION_TTL,
+    authenticate,
+    clear_session_cookie,
+    get_current_admin,
+    open_session,
+    revoke_session,
+    set_session_cookie,
+)
 from .config import get_settings
 from .db import create_schema, dispose_engine, get_session
-from .models import Assignment, Channel, ChannelStream, Device, PlaylistProfile, Source
+from .models import (
+    AdminUser,
+    Assignment,
+    Channel,
+    ChannelStream,
+    Device,
+    PlaylistProfile,
+    Source,
+)
 from .netguard import UnsafeUrlError, fetch_text
 from .secrets import mask_url
-from .security import constant_time_equals, generate_device_token, hash_token, token_prefix
+from .security import generate_device_token, hash_token, token_prefix
 from .services.delivery import build_playlist, get_active_assignment, resolve_stream
 from .services.importing import ImportStats, import_playlist
 
@@ -50,14 +68,65 @@ app = FastAPI(
 
 # --- admin auth --------------------------------------------------------------------------------
 
-
-async def require_admin(x_admin_token: Annotated[str, Header()] = "") -> None:
-    """Temporary admin gate. Replaced by password + TOTP sessions in P1."""
-    if not constant_time_equals(x_admin_token, get_settings().admin_api_key):
-        raise HTTPException(status_code=401, detail="invalid admin token")
+AdminDep = Annotated[AdminUser, Depends(get_current_admin)]
 
 
-AdminDep = Annotated[None, Depends(require_admin)]
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=1, max_length=256)
+    totp: str = Field(default="", max_length=8)
+
+
+class LoginResponse(BaseModel):
+    email: str
+    csrf_token: str
+    expires_in: int
+
+
+class MeOut(BaseModel):
+    email: str
+    last_login_at: datetime | None
+
+
+@app.post("/api/v1/auth/login", response_model=LoginResponse, tags=["auth"])
+async def login(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    session: SessionDep,
+) -> LoginResponse:
+    client_key = request.client.host if request.client else "unknown"
+    user = await authenticate(
+        session,
+        email=payload.email,
+        password=payload.password,
+        code=payload.totp,
+        client_key=client_key,
+    )
+    if user is None:
+        raise HTTPException(status_code=401, detail="invalid credentials")
+    token, csrf = await open_session(
+        session, user=user, ip=client_key, user_agent=request.headers.get("user-agent")
+    )
+    set_session_cookie(response, token)
+    return LoginResponse(
+        email=user.email, csrf_token=csrf, expires_in=int(SESSION_TTL.total_seconds())
+    )
+
+
+@app.post("/api/v1/auth/logout", status_code=204, tags=["auth"])
+async def logout(request: Request, session: SessionDep, _: AdminDep) -> Response:
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        await revoke_session(session, token)
+    out = Response(status_code=204)
+    clear_session_cookie(out)
+    return out
+
+
+@app.get("/api/v1/auth/me", response_model=MeOut, tags=["auth"])
+async def me(admin: AdminDep) -> MeOut:
+    return MeOut(email=admin.email, last_login_at=admin.last_login_at)
 
 
 # --- schemas -----------------------------------------------------------------------------------

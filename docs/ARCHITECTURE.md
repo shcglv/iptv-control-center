@@ -33,6 +33,7 @@ device /p/<token>/s/<key>.ts ──► 302 Location: provider URL ──► play
 | Component | Now (0.1.0) | Target |
 |---|---|---|
 | API | one uvicorn process, FastAPI | unchanged |
+| Migrations | Alembic, applied by `scripts/start.sh` | unchanged |
 | Scheduler | not yet | in-process (APScheduler + PG advisory locks) |
 | Worker | not yet | split into its own container only if load requires it (ADR-0003) |
 | Database | SQLite for dev/tests, PostgreSQL 16 in production | unchanged |
@@ -98,7 +99,7 @@ stream of that container exists. `HEAD` answers `200` locally without touching t
 
 | Concern | Control |
 |---|---|
-| Admin surface | `X-Admin-Token` gate **temporary**, replaced by password + TOTP (P1) |
+| Admin surface | Argon2id password + TOTP, server-side sessions (opaque token, SHA-256 at rest, 12 h TTL), `HttpOnly`/`SameSite=Lax` cookie, CSRF header on every unsafe method, 5 attempts/min login guard |
 | Device access | 32-byte opaque token, SHA-256 at rest, prefix for lookup, instant revocation |
 | Credentials at rest | AES-256-GCM (`IPTV_ENCRYPTION_KEY`, 32 bytes base64) |
 | SSRF | scheme allowlist, DNS resolution check, redirect re-check, 50 MB cap, metadata hosts denied |
@@ -114,9 +115,9 @@ No new infrastructure components. Builds run in Coolify; releases also publish a
 
 ## 9. What is not implemented yet
 
-Admin password/TOTP login · Alembic migrations · EPG ingest and rendering · quality engine ·
-playlist profiles' channel filtering · Playlist Studio · web UI · discovery/forum adapters ·
-Telegram bot · notifications. Tracked in `docs/ROADMAP.md`.
+EPG ingest and rendering · quality engine · playlist-profile channel filtering · Playlist Studio ·
+web UI · discovery/forum adapters · Telegram bot · notifications · CI pipeline · Coolify resources.
+Tracked in `docs/ROADMAP.md`.
 
 ## 10. Reproducibility
 

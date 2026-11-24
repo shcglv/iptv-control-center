@@ -20,9 +20,6 @@ class Settings(BaseSettings):
     # and a warning is logged once. Production MUST set it.
     encryption_key: str = ""
 
-    # Temporary admin gate until password + TOTP login lands.
-    admin_api_key: str = "dev-admin-key-change-me"
-
     display_timezone: str = "Europe/Moscow"
 
     @property

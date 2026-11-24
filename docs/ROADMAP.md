@@ -18,12 +18,12 @@ Legend: `[x]` shipped and verified · `[~]` partially shipped · `[ ]` not start
 ## P1 — Foundation — `[~]`
 
 - [x] Package skeleton, settings, async DB, models
-- [x] Structured modules + unit/integration tests (24 passing)
+- [x] Structured modules + unit/integration tests (36 passing)
 - [x] `pyproject.toml`, `Dockerfile` (digest-pinned), `.dockerignore`, `.gitattributes`
 - [x] AES-256-GCM secret storage
 - [x] SSRF guard
-- [ ] Alembic migrations (currently `create_all` in dev only)
-- [ ] Admin password + TOTP login, sessions, CSRF (replaces `X-Admin-Token`)
+- [x] Alembic migrations (initial schema, applied by `scripts/start.sh`)
+- [x] Admin password + TOTP login, sessions, CSRF
 - [ ] Web UI shell (Prism tokens + navigation)
 - [ ] Coolify resources: Database + Application + domain + backup + Kuma
 - [ ] CI: ruff, mypy, pytest, docker build, Trivy, SBOM

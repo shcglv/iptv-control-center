@@ -25,8 +25,10 @@ RUN groupadd --gid 10001 app \
 WORKDIR /app
 
 # Dependency layer first: rebuilds only when pyproject changes.
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md alembic.ini ./
 COPY src ./src
+COPY migrations ./migrations
+COPY scripts ./scripts
 RUN pip install --no-cache-dir . \
  && rm -rf /app/src
 
@@ -37,4 +39,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status==200 else 1)"
 
-CMD ["python", "-m", "uvicorn", "iptvcc.api:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["sh", "/app/scripts/start.sh"]

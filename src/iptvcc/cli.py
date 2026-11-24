@@ -1,0 +1,56 @@
+"""Operator CLI: ``python -m iptvcc.cli create-admin``."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import getpass
+import sys
+
+from .auth import create_admin_user
+from .db import create_schema, dispose_engine, get_session_factory
+from .totp import provisioning_uri
+
+
+async def _create_admin(email: str, password: str) -> None:
+    await create_schema()
+    factory = get_session_factory()
+    async with factory() as session:
+        user, secret = await create_admin_user(session, email=email, password=password)
+        await session.commit()
+    print(f"admin created: {user.email}")
+    print("")
+    print("TOTP secret (shown once — store it in your password manager):")
+    print(f"  {secret}")
+    print("")
+    print("Add this to your authenticator app:")
+    print(f"  {provisioning_uri(secret, user.email)}")
+    await dispose_engine()
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="iptvcc")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    create = sub.add_parser("create-admin", help="create an admin user with TOTP")
+    create.add_argument("--email", required=True)
+    create.add_argument("--password", help="prompted for when omitted")
+
+    args = parser.parse_args(argv)
+
+    if args.command == "create-admin":
+        password = args.password or getpass.getpass("password (min 12 chars): ")
+        if len(password) < 12:
+            print("error: password must be at least 12 characters", file=sys.stderr)
+            return 2
+        try:
+            asyncio.run(_create_admin(args.email, password))
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        return 0
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

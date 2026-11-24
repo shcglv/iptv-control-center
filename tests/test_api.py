@@ -18,11 +18,10 @@ async def test_health_reports_database(client: httpx.AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_admin_endpoints_require_token(client: httpx.AsyncClient) -> None:
-    assert (await client.get("/api/v1/sources")).status_code == 401
-    assert (
-        await client.get("/api/v1/sources", headers={"X-Admin-Token": "wrong"})
-    ).status_code == 401
+async def test_admin_endpoints_require_session(anon_client: httpx.AsyncClient) -> None:
+    assert (await anon_client.get("/api/v1/sources")).status_code == 401
+    assert (await anon_client.get("/api/v1/channels")).status_code == 401
+    assert (await anon_client.get("/api/v1/devices")).status_code == 401
 
 
 @pytest.mark.asyncio
