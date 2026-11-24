@@ -17,6 +17,8 @@ ARG NODE_IMAGE=node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd
 FROM ${NODE_IMAGE} AS web
 
 WORKDIR /web
+# pnpm must never prompt: the build has no TTY.
+ENV CI=true
 RUN npm install -g pnpm@11.28.5
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile

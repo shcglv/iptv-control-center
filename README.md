@@ -4,11 +4,13 @@ Self-hosted control plane for IPTV: sources, a single channel catalog, EPG, qual
 per-device playlists. **Video never transits the server** — playlists point at provider URLs, and the
 server's only role in playback is an optional HTTP 302 that picks the best source at request time.
 
-> **Status: `0.1.0` — vertical slice.** Working: M3U import → channel catalog → playlist profiles
-> (visibility, order, source pins) → per-device playlist → quality-aware 302 source resolution →
-> XMLTV ingest with channel mapping and per-device guide output, autonomous health probing,
-> source discovery with a review queue, Telegram bot, admin login with TOTP, and a React web UI.
-> Not yet: discovery UI, CI. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+> **Status: `0.2.0`.** Working: M3U import → channel catalog → playlist profiles (visibility,
+> order, source pins) → per-device playlist → quality-aware 302 source resolution → XMLTV ingest
+> with channel mapping and per-device guide output, autonomous health probing, source discovery
+> with a review queue, Telegram bot, admin login with TOTP, and a React web UI with seven screens.
+> CI builds the image and smoke-tests it. Not yet: iptv-org catalog seeding, active ffprobe mode,
+> deployment to the owner's Coolify server. See [`docs/ROADMAP.md`](docs/ROADMAP.md) and
+> [`CHANGELOG.md`](CHANGELOG.md).
 
 ## What it does today
 
@@ -72,6 +74,24 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/devices -WebSession 
 
 Then point OwnTV or VLC at `http://127.0.0.1:8000/p/<token>/live.m3u`.
 
+## Container
+
+```powershell
+docker build -t iptv-control-center:local .
+docker run -d --name iptv -p 8000:8000 `
+  -e IPTV_ENCRYPTION_KEY="<base64 of 32 random bytes>" `
+  -e IPTV_DATABASE_URL="sqlite+aiosqlite:////data/iptv.db" `
+  -e IPTV_PUBLIC_BASE_URL="https://iptv.example" `
+  -v iptv-data:/data `
+  iptv-control-center:local
+
+# verify the image the way CI does
+.\scripts\smoke-container.ps1
+```
+
+The image runs migrations on start, serves the API and the built UI from one process as UID 10001,
+and expects PostgreSQL in production (`IPTV_DATABASE_URL=postgresql+psycopg://…`).
+
 ## Layout
 
 ```
@@ -88,13 +108,27 @@ src/iptvcc/          application package
   netguard.py        SSRF guard
   cli.py             create-admin
   api.py             FastAPI app and routes
-migrations/          Alembic (initial schema)
-scripts/start.sh     container entrypoint: migrate, then serve
-tests/               pytest
+  services/          import, EPG, health, selector, scheduler, profiles, delivery, discovery
+  telegram/          Bot API adapter, bot loop, notifications
+web/                 React + TypeScript SPA (Vite), built into src/iptvcc/static
+migrations/          Alembic
+scripts/             start.sh, check.ps1, smoke-container.ps1
+tests/               pytest (115) + Playwright browser tests
 docs/                architecture, roadmap, decisions
 ```
 
 ## Quality gates
+
+CI runs exactly these steps (`.github/workflows/ci.yml`): backend lint, types and tests; web
+typecheck and build; then an image build with a container smoke test.
+
+```powershell
+.\scripts\check.ps1            # ruff, format, mypy, pytest, web typecheck + build
+.\scripts\check.ps1 -SkipWeb   # backend only
+.\scripts\check.ps1 -Browser   # also run the Playwright tests
+```
+
+Manual equivalents:
 
 ```powershell
 .\.venv\Scripts\python.exe -m ruff check src tests
@@ -105,6 +139,9 @@ docs/                architecture, roadmap, decisions
 $env:IPTV_BROWSER_TESTS = "1"
 .\.venv\Scripts\python.exe -m pytest tests/test_browser.py -q
 ```
+
+The container smoke test checks four things: `/healthz` answers, `/` serves the built SPA, the
+admin CLI works against the migrated database, and the process runs as UID 10001.
 
 ## Non-goals (by design)
 

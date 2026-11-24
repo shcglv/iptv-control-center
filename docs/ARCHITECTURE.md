@@ -261,7 +261,30 @@ Coolify resource shape (unchanged from the approved plan): **1 Database** (Postg
 No new infrastructure components. Builds run in Coolify; releases also publish an immutable
 `ghcr.io/...@sha256:...` image as a fallback.
 
-## 9. What is not implemented yet
+## 10. Build, CI and release
+
+| Step | Command | What it proves |
+|---|---|---|
+| Lint | `ruff check` + `ruff format --check` | style and import hygiene |
+| Types | `mypy src` | strict typing of the whole package |
+| Tests | `pytest -q` | 115 tests on SQLite, including local HTTP fixtures |
+| Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | the UI works in Chromium against a real server process |
+| Web | `pnpm typecheck && pnpm build` | the SPA compiles and produces `src/iptvcc/static` |
+| Image | `docker build` | the multi-stage build, including the Node UI stage |
+| Container | run + `/healthz`, `/`, `create-admin`, `id -u` | the image actually serves the product as UID 10001 |
+
+`.\scripts\check.ps1` runs the local steps; `.github/workflows/ci.yml` runs the same plus the image
+smoke test on every push and pull request. Versions follow SemVer and are recorded in
+`CHANGELOG.md`; the package version lives in `pyproject.toml` and `iptvcc.__version__`.
+
+The image is verified locally with `.\scripts\smoke-container.ps1`: 347 MB, healthy in ~5 s,
+`/` serves the SPA, `create-admin` writes to the migrated database, and `id -u` is 10001.
+
+The build itself is where three packaging defects surfaced — a missing runtime dependency
+(`httpx`), a host `node_modules` leaking into the context, and TypeScript 7's platform packages
+breaking `--frozen-lockfile` in Linux. All three are fixed and covered by the smoke test.
+
+## 11. What is not implemented yet
 
 Active probe mode (ffprobe) · Playlist Studio drag-and-drop · discovery/forum adapters ·
 Telegram rich messages/widgets · CI pipeline · Coolify resources.

@@ -1,4 +1,5 @@
 .git
+.github
 .venv
 venv
 __pycache__
@@ -15,3 +16,9 @@ docs
 tests
 .gitignore
 .gitattributes
+
+# The web UI is built inside the image; a host-built tree must never leak into the context.
+web/node_modules
+web/dist
+node_modules
+src/iptvcc/static
