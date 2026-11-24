@@ -213,6 +213,16 @@ class ChannelPage(BaseModel):
     items: list[ChannelOut]
 
 
+class ChannelSourceOut(BaseModel):
+    stream_id: int
+    source: str
+    name: str
+    container: str
+    score: float
+    uptime_ratio: float
+    resolution: str | None
+
+
 class DeviceCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     kind: str = "android_tv"
@@ -354,8 +364,54 @@ async def list_channels(
     return ChannelPage(total=total, items=items)
 
 
-# --- devices -----------------------------------------------------------------------------------
+@app.get(
+    "/api/v1/channels/{public_key}/sources",
+    response_model=list[ChannelSourceOut],
+    tags=["catalog"],
+)
+async def channel_sources(
+    public_key: str, session: SessionDep, _: AdminDep
+) -> list[ChannelSourceOut]:
+    """Ranked sources of one channel, used by the profile editor to pin a stream."""
+    channel = await session.scalar(select(Channel).where(Channel.public_key == public_key))
+    if channel is None:
+        raise HTTPException(status_code=404, detail="channel not found")
 
+    candidates = await rank_candidates(session, channel, None)
+    if not candidates:
+        return []
+
+    rows = (
+        await session.execute(
+            select(Stream, StreamQuality, Source)
+            .join(Source, Source.id == Stream.source_id)
+            .outerjoin(StreamQuality, StreamQuality.stream_id == Stream.id)
+            .where(Stream.id.in_([candidate.stream_id for candidate in candidates]))
+        )
+    ).all()
+    details = {stream.id: (stream, quality, source) for stream, quality, source in rows}
+
+    out: list[ChannelSourceOut] = []
+    for candidate in candidates:
+        found = details.get(candidate.stream_id)
+        if found is None:
+            continue
+        stream, quality, source = found
+        out.append(
+            ChannelSourceOut(
+                stream_id=stream.id,
+                source=source.name,
+                name=stream.name,
+                container=stream.container,
+                score=candidate.score,
+                uptime_ratio=quality.uptime_ratio if quality else 0.0,
+                resolution=quality.resolution if quality else None,
+            )
+        )
+    return out
+
+
+# --- devices -----------------------------------------------------------------------------------
 
 @app.post("/api/v1/devices", response_model=DeviceWithToken, status_code=201, tags=["devices"])
 async def create_device(payload: DeviceCreate, session: SessionDep, _: AdminDep) -> DeviceWithToken:

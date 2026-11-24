@@ -187,3 +187,30 @@ async def test_import_rejects_non_playlist_body(client: httpx.AsyncClient) -> No
 @pytest.mark.asyncio
 async def test_resolver_rejects_unknown_token(client: httpx.AsyncClient) -> None:
     assert (await client.get("/p/nope/live.m3u")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_channel_sources_endpoint(client: httpx.AsyncClient) -> None:
+    source = (
+        await client.post(
+            "/api/v1/sources", json={"name": "Src", "url": "http://p.test/l.m3u"}, headers=ADMIN_HEADERS
+        )
+    ).json()
+    await client.post(
+        f"/api/v1/sources/{source['id']}/import", json={"m3u": SAMPLE_M3U}, headers=ADMIN_HEADERS
+    )
+    page = (await client.get("/api/v1/channels", headers=ADMIN_HEADERS)).json()
+    channel = page["items"][0]
+
+    response = await client.get(
+        f"/api/v1/channels/{channel['public_key']}/sources", headers=ADMIN_HEADERS
+    )
+    assert response.status_code == 200
+    rows = response.json()
+    assert len(rows) == 1
+    assert rows[0]["stream_id"] > 0
+    assert rows[0]["container"] in {"ts", "m3u8", "mpd", "other"}
+    assert 0.0 <= rows[0]["score"] <= 100.0
+
+    missing = await client.get("/api/v1/channels/pk-nope/sources", headers=ADMIN_HEADERS)
+    assert missing.status_code == 404

@@ -100,6 +100,10 @@ docs/                architecture, roadmap, decisions
 .\.venv\Scripts\python.exe -m ruff check src tests
 .\.venv\Scripts\python.exe -m mypy src
 .\.venv\Scripts\python.exe -m pytest -q
+
+# browser smoke test (needs `python -m playwright install chromium`)
+$env:IPTV_BROWSER_TESTS = "1"
+.\.venv\Scripts\python.exe -m pytest tests/test_browser.py -q
 ```
 
 ## Non-goals (by design)

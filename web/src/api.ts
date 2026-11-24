@@ -184,6 +184,49 @@ export const rotateDevice = (id: string): Promise<DeviceWithToken> =>
 
 export const listProfiles = (): Promise<ProfileOut[]> => request<ProfileOut[]>("/api/v1/profiles");
 
+export interface ProfileChannel {
+  public_key: string;
+  name: string;
+  number: number | null;
+  group: string | null;
+  visible: boolean;
+  sort_index: number | null;
+  pinned_stream_id: number | null;
+  overridden: boolean;
+}
+
+export interface ChannelSource {
+  stream_id: number;
+  source: string;
+  name: string;
+  container: string;
+  score: number;
+  uptime_ratio: number;
+  resolution: string | null;
+}
+
+export const createProfile = (name: string): Promise<ProfileOut> =>
+  request<ProfileOut>("/api/v1/profiles", { method: "POST", body: JSON.stringify({ name }) });
+
+export const listProfileChannels = (id: number): Promise<ProfileChannel[]> =>
+  request<ProfileChannel[]>(`/api/v1/profiles/${id}/channels`);
+
+export const setProfileChannel = (
+  id: number,
+  key: string,
+  body: { visible: boolean; sort_index?: number | null; pinned_stream_id?: number | null },
+): Promise<ProfileChannel> =>
+  request<ProfileChannel>(`/api/v1/profiles/${id}/channels/${key}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+
+export const clearProfileChannel = (id: number, key: string): Promise<void> =>
+  request<void>(`/api/v1/profiles/${id}/channels/${key}`, { method: "DELETE" });
+
+export const listChannelSources = (key: string): Promise<ChannelSource[]> =>
+  request<ChannelSource[]>(`/api/v1/channels/${key}/sources`);
+
 export const schedulerStatus = (): Promise<SchedulerStatus> =>
   request<SchedulerStatus>("/api/v1/scheduler/status");
 

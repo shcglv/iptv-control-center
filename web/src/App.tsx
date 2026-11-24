@@ -4,10 +4,11 @@ import Login from "./pages/Login";
 import Overview from "./pages/Overview";
 import Channels from "./pages/Channels";
 import Quality from "./pages/Quality";
+import Profiles from "./pages/Profiles";
 import Sources from "./pages/Sources";
 import Devices from "./pages/Devices";
 
-type Tab = "overview" | "channels" | "quality" | "sources" | "devices";
+type Tab = "overview" | "channels" | "quality" | "profiles" | "sources" | "devices";
 
 const NAV: { group: string; items: { id: Tab; label: string; icon: string }[] }[] = [
   {
@@ -21,6 +22,7 @@ const NAV: { group: string; items: { id: Tab; label: string; icon: string }[] }[
   {
     group: "Manage",
     items: [
+      { id: "profiles", label: "Плейлисты", icon: "◍" },
       { id: "sources", label: "Источники", icon: "◈" },
       { id: "devices", label: "Устройства", icon: "▣" },
     ],
@@ -99,6 +101,7 @@ function Shell({ onSignedOut }: { onSignedOut: () => void }) {
           {tab === "overview" && <Overview />}
           {tab === "channels" && <Channels />}
           {tab === "quality" && <Quality />}
+          {tab === "profiles" && <Profiles />}
           {tab === "sources" && <Sources />}
           {tab === "devices" && <Devices />}
         </main>

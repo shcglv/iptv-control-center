@@ -60,9 +60,12 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [ ] Client Compatibility Engine (capability registry, `RenderPlan`)
 - [ ] Devices & Clients UI, QR, copy actions
 
-## P4b — Playlist Studio — `[ ]`
+## P4b — Playlist Studio — `[~]`
 
-Drag & drop editor, impact panel, M3U/EPG preview.
+- [x] Profiles screen: create profile, per-channel visibility, up/down ordering, source pin with live scores
+- [x] Profile changes reflect in the playlist and the guide on the next request
+- [ ] Drag & drop ordering, category visibility editor, impact panel ("12 devices affected")
+- [ ] M3U / EPG preview inside the editor
 
 ## P5 — EPG — `[~]`
 
