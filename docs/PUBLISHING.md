@@ -17,6 +17,17 @@ Verified: `git bundle verify` reports *"The bundle records a complete history"* 
 On GitHub, create a repository — private is fine — with **no** README, license or `.gitignore`
 (those already exist here). Note the URL, e.g. `git@github.com:shcglv/iptv-control-center.git`.
 
+Before pushing, run the preparation script — it refuses a dirty tree, scans tracked files for
+obvious secrets, runs ruff and mypy, and regenerates the bundle:
+
+```powershell
+.\scripts\publish.ps1
+# or, to include the test suite:
+.\scripts\publish.ps1 -WithTests
+```
+
+It never pushes. When it prints the commands, run them yourself.
+
 ## 2. Push from this workstation
 
 ```powershell
