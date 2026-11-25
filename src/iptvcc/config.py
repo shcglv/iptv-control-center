@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # Channels served in the last 24 h are "hot": checked often. Everything else: hourly.
     scheduler_hot_interval_seconds: int = 300
     scheduler_cold_interval_seconds: int = 3600
+    # Probe depth: passive reads 2 KB over HTTP; active also runs ffprobe on the stream.
+    probe_mode: str = "passive"
+    probe_concurrency: int = 2
+    ffprobe_path: str = "ffprobe"
+    ffprobe_timeout_seconds: int = 12
 
     # Telegram bot. Without a token the bot is disabled; polling needs no inbound port.
     telegram_bot_token: str = ""

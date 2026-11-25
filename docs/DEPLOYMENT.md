@@ -43,6 +43,7 @@ Fits the current server headroom: ~1.7 GB available, well under the 640 MB budge
 | `IPTV_TELEGRAM_OWNER_ID` | your numeric id | First message from it bootstraps the allowlist |
 | `IPTV_ALLOW_PRIVATE_NETWORK_TARGETS` | `0` | Only `1` for a LAN provider |
 | `IPTV_PUBLIC_RATE_LIMIT_PER_MINUTE` | `120` | Per device token and client address |
+| `IPTV_PROBE_MODE` | `passive` | `active` needs an image built with `INSTALL_FFMPEG=true` (+628 MB) |
 
 ## Steps (after GO)
 

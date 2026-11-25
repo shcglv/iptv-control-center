@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-11-25
+
+### Added
+
+- **Active probe mode** (`IPTV_PROBE_MODE=active`): after a successful HTTP probe, ffprobe inspects
+  the stream with `-show_streams -show_format` under a wall-clock and `-rw_timeout` bound, filling
+  real codecs, resolution and bitrate. A failed inspection counts as a failed check — that is the
+  point of the mode. Concurrency is capped by `IPTV_PROBE_CONCURRENCY` (default 2).
+- The binary is **not** in the default image: build with `--build-arg INSTALL_FFMPEG=true`. Measured
+  cost is **+628 MB** (349 → 977 MB), documented in `PERFORMANCE.md`; passive remains the default.
+
+### Verified
+
+- ffprobe 7.1.5 runs in the built image and the process still runs as UID 10001.
+- Nine tests cover the command shape, JSON parsing, a missing binary, a non-zero exit, and that
+  passive mode never invokes ffprobe.
+
 ## [0.4.1] — 2026-11-25
 
 ### Added

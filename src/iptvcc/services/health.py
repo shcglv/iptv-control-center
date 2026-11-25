@@ -11,6 +11,7 @@ includes connect and TLS). Connect time is not measured separately to avoid a se
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import socket
 import time
@@ -22,6 +23,7 @@ import httpx
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import get_settings
 from ..models import HealthCheck, Stream, StreamQuality
 from ..secrets import decrypt
 
@@ -147,6 +149,84 @@ async def probe_url(url: str, *, timeout: float = PROBE_TIMEOUT) -> ProbeResult:
     )
 
 
+@dataclass
+class MediaInfo:
+    """What an active inspection learned. ``error`` is set when the inspection itself failed."""
+
+    resolution: str | None = None
+    video_codec: str | None = None
+    audio_codec: str | None = None
+    bandwidth_bps: int | None = None
+    error: str | None = None
+
+
+def ffprobe_command(binary: str, url: str, timeout: float) -> list[str]:
+    """Arguments for an inspection that reads a few seconds of the stream, not the whole VOD."""
+    return [
+        binary,
+        "-v",
+        "error",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        "-rw_timeout",
+        str(int(timeout * 1_000_000)),
+        url,
+    ]
+
+
+def parse_ffprobe_json(payload: str) -> MediaInfo:
+    try:
+        data = json.loads(payload)
+    except ValueError:
+        return MediaInfo(error="unreadable ffprobe output")
+    streams = data.get("streams") or []
+    video = next((item for item in streams if item.get("codec_type") == "video"), None)
+    audio = next((item for item in streams if item.get("codec_type") == "audio"), None)
+    resolution = None
+    if video and video.get("width") and video.get("height"):
+        resolution = f"{video['width']}x{video['height']}"
+    bit_rate = (data.get("format") or {}).get("bit_rate") or (video or {}).get("bit_rate")
+    try:
+        bandwidth = int(bit_rate) if bit_rate else None
+    except (TypeError, ValueError):
+        bandwidth = None
+    return MediaInfo(
+        resolution=resolution,
+        video_codec=video.get("codec_name") if video else None,
+        audio_codec=audio.get("codec_name") if audio else None,
+        bandwidth_bps=bandwidth,
+    )
+
+
+async def probe_media(url: str, *, binary: str = "ffprobe", timeout: float = 12.0) -> MediaInfo:
+    """Inspect a stream with ffprobe. Any failure is reported, never raised."""
+    command = ffprobe_command(binary, url, timeout)
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        return MediaInfo(error="ffprobe is not installed")
+    except OSError as exc:
+        return MediaInfo(error=f"ffprobe could not start: {exc}")
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout + 2)
+    except TimeoutError:
+        process.kill()
+        await process.wait()
+        return MediaInfo(error="ffprobe timed out")
+    if process.returncode != 0:
+        detail = stderr.decode("utf-8", errors="replace").strip().splitlines()
+        return MediaInfo(
+            error=(detail[-1] if detail else f"ffprobe exit {process.returncode}")[:200]
+        )
+    return parse_ffprobe_json(stdout.decode("utf-8", errors="replace"))
+
+
 async def probe_stream(stream: Stream, *, timeout: float = PROBE_TIMEOUT) -> ProbeResult:
     try:
         url = decrypt(stream.url_enc)
@@ -156,6 +236,21 @@ async def probe_stream(stream: Stream, *, timeout: float = PROBE_TIMEOUT) -> Pro
     if result.ok and result.resolution is None and stream.container == "m3u8":
         # A media playlist with no variants: the stream is alive, format unknown.
         result.resolution = None
+
+    settings = get_settings()
+    if result.ok and settings.probe_mode == "active":
+        info = await probe_media(
+            url, binary=settings.ffprobe_path, timeout=settings.ffprobe_timeout_seconds
+        )
+        if info.error is not None:
+            # Active mode means "can it actually be decoded", so a failed inspection is a failure.
+            result.ok = False
+            result.error_class = "ffprobe"
+        else:
+            result.resolution = info.resolution or result.resolution
+            result.video_codec = info.video_codec or result.video_codec
+            result.audio_codec = info.audio_codec or result.audio_codec
+            result.bandwidth_bps = info.bandwidth_bps or result.bandwidth_bps
     return result
 
 
@@ -188,7 +283,8 @@ async def run_probe_round(
     if not rows:
         return {"probed": 0, "ok": 0, "failed": 0}
 
-    semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
+    settings = get_settings()
+    semaphore = asyncio.Semaphore(max(1, settings.probe_concurrency))
 
     async def run(stream: Stream) -> tuple[Stream, ProbeResult]:
         async with semaphore:

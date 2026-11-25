@@ -147,6 +147,11 @@ freshly mapped channel can take five minutes to appear.
 That is generous for a player; a stick hammering the resolver usually means a misconfigured client.
 Raise `IPTV_PUBLIC_RATE_LIMIT_PER_MINUTE` only after identifying the caller.
 
+**Active probing.** `IPTV_PROBE_MODE=active` additionally runs ffprobe and proves decodability, but
+the binary is not in the default image: build with `--build-arg INSTALL_FFMPEG=true`. Measured cost
+is **+628 MB** of image (349 → 977 MB), so it is off by default. Concurrency is capped by
+`IPTV_PROBE_CONCURRENCY` (default 2) — do not raise it on a 2-vCPU host.
+
 **Disk is full.** Guides live in the artifacts directory and are regenerated; old `.xml`/`.xml.gz`
 files are safe to delete. Check `docker system df` for old images.
 

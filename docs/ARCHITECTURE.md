@@ -143,6 +143,13 @@ with `#EXTM3U`, the master playlist yields `RESOLUTION`, `CODECS` and `BANDWIDTH
 known without ffprobe. Connect time is not measured separately (that would cost a second
 connection); `ttfb_ms` covers connect + request + first byte.
 
+**Probe (active mode).** `IPTV_PROBE_MODE=active` additionally runs ffprobe on the stream after a
+successful HTTP probe: `-show_streams -show_format`, bounded by `-rw_timeout` and a wall-clock limit,
+with `IPTV_PROBE_CONCURRENCY` processes in flight. It answers "can it actually be decoded" and fills
+real codecs/resolution/bitrate. A failed inspection counts as a failed check, because that is the
+point of the mode. The binary is not in the default image — build with
+`--build-arg INSTALL_FFMPEG=true`, which roughly doubles the image (see `PERFORMANCE.md`).
+
 **Aggregates.** Every probe writes a `health_check` row and refreshes `stream_quality`:
 `uptime_ratio`, `avg_ttfb_ms`, `p90_ttfb_ms` over the last 50 successful samples,
 `consecutive_failures`, last error class, and the last observed format. Samples are pruned after

@@ -58,6 +58,23 @@ EPG ingest 13.8 s, guide 4.9 s.
 | EPG ingest ~44 s for 240 000 programmes | Runs on the import/schedule path, not on a device request. |
 | SQLite single-writer | Production uses PostgreSQL; imports are scheduled rather than interactive. |
 
+## Probe modes: what active mode costs
+
+`IPTV_PROBE_MODE=active` adds ffprobe to the image. Measured on this machine:
+
+| Image | Size |
+|---|---|
+| default (`INSTALL_FFMPEG=false`) | **349 MB** |
+| `--build-arg INSTALL_FFMPEG=true` | **977 MB** |
+
+That is **+628 MB**, not the "+70 MB" one would guess: Debian's `ffmpeg` package pulls a large
+dependency tree (librsvg, cairo, fonts, and so on) even with `--no-install-recommends`. The binary
+itself works and the process still runs as UID 10001.
+
+Recommendation: keep passive mode on the server. Enable active mode only if "does it actually
+decode" is worth ~0.6 GB of image and ~1 CPU-second per probed stream. A slim alternative would be a
+statically linked ffprobe build, which was not used because it means trusting a third-party binary.
+
 ## Reproduce
 
 ```powershell

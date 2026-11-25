@@ -12,6 +12,8 @@
 
 ARG PYTHON_IMAGE=python:3.12-slim@sha256:191083cdf6c7bda8c76158983163ead5d5cf7b77cf3033e805bb0f5296f51b4b
 ARG NODE_IMAGE=node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
+# ffprobe is only needed for IPTV_PROBE_MODE=active; the default image stays small.
+ARG INSTALL_FFMPEG=false
 
 # ---------------------------------------------------------------- web build
 FROM ${NODE_IMAGE} AS web
@@ -36,6 +38,13 @@ ENV PYTHONUNBUFFERED=1 \
 
 RUN groupadd --gid 10001 app \
  && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin app
+
+ARG INSTALL_FFMPEG
+RUN if [ "$INSTALL_FFMPEG" = "true" ]; then \
+      apt-get update \
+      && apt-get install -y --no-install-recommends ffmpeg \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 WORKDIR /app
 
