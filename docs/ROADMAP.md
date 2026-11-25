@@ -127,6 +127,7 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] SSRF test suite (schemes, credentials, private ranges, metadata, LAN switch)
 - [x] Public endpoint rate limiting with `Retry-After`
 - [x] Backup tooling with integrity verification, plus an executed restore drill
+- [x] Container acceptance test: the built image is exercised end to end, including restart persistence
 - [x] Operations runbook (`docs/RUNBOOK.md`)
 - [ ] Log audit and request IDs
 - [ ] Accessibility and visual regression checks in CI

@@ -76,7 +76,7 @@ jobs:
           retention-days: 7
 
   docker:
-    name: Image build + smoke test
+    name: Image build + acceptance
     runs-on: ubuntu-24.04
     needs: [backend, web]
     steps:
@@ -94,44 +94,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke test
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/iptv-data
-          chmod 777 /tmp/iptv-data
-          docker run -d --name iptv-ci -p 8000:8000 \
-            -e IPTV_APP_ENV=test \
-            -e IPTV_ENCRYPTION_KEY="$(openssl rand -base64 32)" \
-            -e IPTV_DATABASE_URL="sqlite+aiosqlite:////data/iptv.db" \
-            -e IPTV_PUBLIC_BASE_URL="http://127.0.0.1:8000" \
-            -e IPTV_SCHEDULER_ENABLED=false \
-            -e IPTV_TELEGRAM_ENABLED=false \
-            -v /tmp/iptv-data:/data \
-            iptv-control-center:ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-          ready=0
-          for _ in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:8000/healthz >/dev/null 2>&1; then ready=1; break; fi
-            sleep 2
-          done
-          if [ "$ready" != "1" ]; then
-            echo "::error::the API did not become healthy"
-            docker logs iptv-ci
-            exit 1
-          fi
+      - name: Install test dependencies
+        run: python -m pip install -e ".[dev]"
 
-          # The UI is served by the same container.
-          curl -fsS http://127.0.0.1:8000/ | grep -q 'id="root"'
-          # The admin CLI works against the migrated database.
-          docker exec iptv-ci python -m iptvcc.cli create-admin \
-            --email ci@test.local --password correct-horse-battery >/dev/null
-          # The process does not run as root.
-          test "$(docker exec iptv-ci id -u)" = "10001"
+      - name: Acceptance against the built image
+        env:
+          IPTV_CONTAINER_TESTS: "1"
+          IPTV_TEST_IMAGE: iptv-control-center:ci
+          IPTV_TEST_IMAGE_SKIP_BUILD: "1"
+        run: pytest tests/test_container.py -q
 
-      - name: Logs
+      - name: Container logs
         if: failure()
-        run: docker logs iptv-ci || true
+        run: docker logs iptv-acceptance || true
 
       - name: Cleanup
         if: always()
-        run: docker rm -f iptv-ci || true
+        run: docker rm -f iptv-acceptance || true

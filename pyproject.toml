@@ -49,7 +49,10 @@ iptvcc = ["py.typed", "static/index.html", "static/assets/*", "static/*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
-markers = ["browser: needs Chromium; set IPTV_BROWSER_TESTS=1 to run"]
+markers = [
+    "browser: needs Chromium; set IPTV_BROWSER_TESTS=1 to run",
+    "container: needs Docker; set IPTV_CONTAINER_TESTS=1 to run",
+]
 filterwarnings = ["error::DeprecationWarning:iptvcc.*"]
 
 [tool.ruff]

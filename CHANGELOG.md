@@ -30,6 +30,10 @@ Performance work measured at the top of the target range (10 000 channels, 30 00
 
 - `scripts/bench_scale.py` — reproducible benchmark for import, render, EPG ingest, mapping and
   guide build.
+- Container acceptance test (`tests/test_container.py`): builds the image, creates the admin through
+  the CLI, imports a playlist, hides a channel in a profile, fetches the device playlist and guide,
+  checks the 302 resolver, runs discovery against a host feed, accepts a candidate, restarts the
+  container and verifies the data survived. Wired into CI as the `docker` job.
 
 ## [0.2.0] — 2026-11-25
 

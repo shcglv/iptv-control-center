@@ -275,11 +275,12 @@ No new infrastructure components. Builds run in Coolify; releases also publish a
 | Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | the UI works in Chromium against a real server process |
 | Web | `pnpm typecheck && pnpm build` | the SPA compiles and produces `src/iptvcc/static` |
 | Image | `docker build` | the multi-stage build, including the Node UI stage |
-| Container | run + `/healthz`, `/`, `create-admin`, `id -u` | the image actually serves the product as UID 10001 |
+| Container | `pytest tests/test_container.py` (`IPTV_CONTAINER_TESTS=1`) | the image itself: admin CLI, import, profile, device playlist, 302 resolver, guide, discovery, restart persistence, UID 10001 |
 
 `.\scripts\check.ps1` runs the local steps; `.github/workflows/ci.yml` runs the same plus the image
-smoke test on every push and pull request. Versions follow SemVer and are recorded in
-`CHANGELOG.md`; the package version lives in `pyproject.toml` and `iptvcc.__version__`.
+build and the container acceptance test on every push and pull request. Versions follow SemVer and
+are recorded in `CHANGELOG.md`; the package version lives in `pyproject.toml` and
+`iptvcc.__version__`.
 
 The image is verified locally with `.\scripts\smoke-container.ps1`: 347 MB, healthy in ~5 s,
 `/` serves the SPA, `create-admin` writes to the migrated database, and `id -u` is 10001.
