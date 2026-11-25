@@ -75,7 +75,7 @@ async def resolve_stream(
         return None
 
     channel = await session.scalar(select(Channel).where(Channel.public_key == public_key))
-    if channel is None:
+    if channel is None or channel.is_hidden:
         return None
 
     pinned = await pinned_stream_for(session, profile_id, channel.id) if profile_id else None

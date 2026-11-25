@@ -143,6 +143,8 @@ class Channel(Base):
     epg_id: Mapped[str | None] = mapped_column(String(255))
     match_key: Mapped[str | None] = mapped_column(String(512), index=True)
     is_hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Identity from the public catalog (iptv-org ids look like "BBCOne.uk"); set by matching.
+    catalog_id: Mapped[str | None] = mapped_column(String(128), index=True)
 
     # Selection memory: lets the selector keep its current source instead of flapping between
     # two streams whose scores are within the hysteresis band.
@@ -517,3 +519,40 @@ class DiscoveryCandidate(Base):
     promoted_source_id: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# --- catalog and blocklist ---------------------------------------------------------------------
+
+
+class CatalogChannel(Base):
+    """Identity record imported from a public channel catalog (e.g. iptv-org)."""
+
+    __tablename__ = "catalog_channel"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    catalog_id: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(256))
+    alt_names: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    country: Mapped[str | None] = mapped_column(String(8), index=True)
+    categories: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    logo_url: Mapped[str | None] = mapped_column(Text)
+    website: Mapped[str | None] = mapped_column(Text)
+    is_nsfw: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CatalogBlock(Base):
+    """A take-down or policy block.
+
+    ``kind`` is one of ``catalog_id``, ``tvg_id``, ``name`` (a channel rule) or ``domain``
+    (a source rule, matched against the plaintext source URL host).
+    """
+
+    __tablename__ = "catalog_block"
+    __table_args__ = (UniqueConstraint("kind", "value", name="uq_catalog_block_kind_value"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    value: Mapped[str] = mapped_column(String(255), index=True)
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

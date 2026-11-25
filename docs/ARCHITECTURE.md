@@ -64,6 +64,7 @@ Measured baselines on the host: postgres 15.9 MB RSS, comparable Python APIs 11�
 | `services/profiles.py` | effective lineup per playlist profile (visibility, order, pins) |
 | `services/delivery.py` | per-device playlist rendering, 302 resolver |
 | `services/discovery/` | extractors, RSS/HTML adapters, candidate store |
+| `services/catalog.py` | channel identity catalog, matching pass, take-down blocks |
 | `ratelimit.py` | sliding-window limits for the public `/p/…` endpoints |
 | `backup.py` | online SQLite backup, `pg_dump` for PostgreSQL, verification |
 | `telegram/` | Bot API adapter, long-polling bot, notification scan |
@@ -244,6 +245,21 @@ feed / forum page ──► adapter ──► extractors ──► candidate sto
 
 Adapters fetch through `netguard`, so SSRF rules apply to discovery exactly as to imports.
 `IPTV_ALLOW_PRIVATE_NETWORK_TARGETS` relaxes the address check for LAN sources and is off by default.
+
+## 6.8 Channel identity and blocks
+
+Playlists name channels inconsistently; the catalog supplies an identity that does not depend on a
+provider's spelling.
+
+| Piece | Behaviour |
+|---|---|
+| Catalog import | `id`, `name`, `alt_names`, `country`, `categories`, `logo`, `website` — the iptv-org channel shape, accepted as-is by `POST /api/v1/catalog/import` or `scripts/catalog_import.py` |
+| Matching | exact normalised name or alias; **country tie-break** when several catalogs share a name (`uk` is treated as `gb`). Deliberately no fuzzy matching — silently merging two real channels is worse than leaving one unmatched |
+| Effect | `channel.catalog_id` is set; a channel without `tvg_id` inherits the catalog id, which is what the guide needs |
+| Blocks | `catalog_id`, `tvg_id`, `name` hide a channel; `domain` disables a source. Hiding removes the channel from playlists, guides **and** the resolver |
+| Re-application | A block is applied when created and can be re-applied to the whole catalog; block rows are never deleted by the block itself |
+
+Matching is idempotent: already matched channels are counted as `already` and never re-pointed.
 
 ## 7. Security
 

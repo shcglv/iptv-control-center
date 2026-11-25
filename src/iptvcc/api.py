@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
@@ -35,6 +35,7 @@ from .db import create_schema, dispose_engine, get_session, get_session_factory
 from .models import (
     AdminUser,
     Assignment,
+    CatalogBlock,
     Category,
     Channel,
     ChannelEpgMap,
@@ -56,6 +57,12 @@ from .quality import compute
 from .ratelimit import public_rate_limit
 from .secrets import decrypt, mask_url
 from .security import generate_device_token, hash_token, token_prefix
+from .services.catalog import (
+    apply_blocklist,
+    catalog_status,
+    ingest_catalog,
+    match_channels,
+)
 from .services.delivery import build_playlist, get_active_assignment, resolve_stream
 from .services.discovery import ADAPTERS, store_items
 from .services.epg import (
@@ -889,6 +896,112 @@ async def _profile_out(session: AsyncSession, profile: PlaylistProfile) -> Profi
         channels_visible=visible,
         channels_total=total,
     )
+
+
+# --- catalog and blocklist ---------------------------------------------------------------------
+
+
+class CatalogImportIn(BaseModel):
+    """iptv-org channel objects: ``{id, name, alt_names, country, categories, logo, ...}``."""
+
+    channels: list[dict[str, Any]] = Field(min_length=1)
+
+
+class CatalogStatsOut(BaseModel):
+    received: int
+    created: int
+    updated: int
+    skipped: int
+
+
+class MatchStatsOut(BaseModel):
+    matched: int
+    unmatched: int
+    already: int
+
+
+class BlockIn(BaseModel):
+    kind: Literal["catalog_id", "tvg_id", "name", "domain"]
+    value: str = Field(min_length=1, max_length=255)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class BlockOut(BaseModel):
+    id: int
+    kind: str
+    value: str
+    reason: str | None
+    created_at: datetime
+
+
+class CatalogStatusOut(BaseModel):
+    catalog_channels: int
+    channels: int
+    matched_channels: int
+    unmatched_channels: int
+    blocks: int
+
+
+@app.post("/api/v1/catalog/import", response_model=CatalogStatsOut, tags=["catalog"])
+async def catalog_import(
+    payload: CatalogImportIn, session: SessionDep, _: AdminDep
+) -> CatalogStatsOut:
+    stats = await ingest_catalog(session, payload.channels)
+    return CatalogStatsOut(**stats.as_dict())
+
+
+@app.post("/api/v1/catalog/match", response_model=MatchStatsOut, tags=["catalog"])
+async def catalog_match(session: SessionDep, _: AdminDep) -> MatchStatsOut:
+    stats = await match_channels(session)
+    return MatchStatsOut(**stats.as_dict())
+
+
+@app.get("/api/v1/catalog/status", response_model=CatalogStatusOut, tags=["catalog"])
+async def catalog_state(session: SessionDep, _: AdminDep) -> CatalogStatusOut:
+    return CatalogStatusOut(**await catalog_status(session))
+
+
+@app.get("/api/v1/blocklist", response_model=list[BlockOut], tags=["catalog"])
+async def list_blocks(session: SessionDep, _: AdminDep) -> list[BlockOut]:
+    rows = (await session.scalars(select(CatalogBlock).order_by(CatalogBlock.id.desc()))).all()
+    return [
+        BlockOut(
+            id=row.id, kind=row.kind, value=row.value, reason=row.reason, created_at=row.created_at
+        )
+        for row in rows
+    ]
+
+
+@app.post("/api/v1/blocklist", response_model=BlockOut, status_code=201, tags=["catalog"])
+async def add_block(payload: BlockIn, session: SessionDep, _: AdminDep) -> BlockOut:
+    existing = await session.scalar(
+        select(CatalogBlock).where(
+            CatalogBlock.kind == payload.kind, CatalogBlock.value == payload.value
+        )
+    )
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="this block already exists")
+    block = CatalogBlock(kind=payload.kind, value=payload.value, reason=payload.reason)
+    session.add(block)
+    await session.flush()
+    await apply_blocklist(session)
+    return BlockOut(
+        id=block.id,
+        kind=block.kind,
+        value=block.value,
+        reason=block.reason,
+        created_at=block.created_at,
+    )
+
+
+@app.delete("/api/v1/blocklist/{block_id}", status_code=204, tags=["catalog"])
+async def delete_block(block_id: int, session: SessionDep, _: AdminDep) -> Response:
+    block = await session.get(CatalogBlock, block_id)
+    if block is None:
+        raise HTTPException(status_code=404, detail="block not found")
+    await session.delete(block)
+    await session.flush()
+    return Response(status_code=204)
 
 
 # --- discovery ---------------------------------------------------------------------------------

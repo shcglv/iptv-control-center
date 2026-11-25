@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import os
 import statistics
 import tempfile
@@ -52,7 +53,8 @@ def build_xmltv(channels: int, programmes: int, start: datetime) -> str:
     parts = ['<?xml version="1.0" encoding="UTF-8"?>', "<tv>"]
     for index in range(channels):
         parts.append(
-            f'<channel id="ch{index}.test"><display-name>Channel {index:05d}</display-name></channel>'
+            f'<channel id="ch{index}.test">'
+            f"<display-name>Channel {index:05d}</display-name></channel>"
         )
     for index in range(channels):
         for slot in range(programmes):
@@ -147,12 +149,12 @@ async def run(channels: int, sources: int, epg_channels: int, programmes: int) -
             )
         )
 
-        guide = ""
         if epg_channels:
             start = datetime.now(UTC).replace(second=0, microsecond=0)
             xml = build_xmltv(epg_channels, programmes, start)
             print(
-                f"xmltv size: {len(xml) / 1024 / 1024:.2f} MiB, {epg_channels * programmes} programmes"
+                f"xmltv size: {len(xml) / 1024 / 1024:.2f} MiB, "
+                f"{epg_channels * programmes} programmes"
             )
 
             started = time.perf_counter()
@@ -188,16 +190,16 @@ async def run(channels: int, sources: int, epg_channels: int, programmes: int) -
                     (
                         "guide build",
                         elapsed,
-                        f"{xml_bytes / 1024 / 1024:.1f} MiB XML, {gz_bytes / 1024 / 1024:.1f} MiB gzip",
+                        f"{xml_bytes / 1024 / 1024:.1f} MiB XML, "
+                        f"{gz_bytes / 1024 / 1024:.1f} MiB gzip",
                     )
                 )
 
     await db.dispose_engine()
     if temporary is not None:
-        try:
+        # Windows can keep the SQLite file locked for a moment; the OS cleans temp eventually.
+        with contextlib.suppress(OSError):
             temporary.cleanup()
-        except OSError:
-            pass  # Windows can keep the SQLite file locked for a moment; the OS cleans temp. long-term
 
     print("\n| operation | time | notes |")
     print("|---|---|---|")

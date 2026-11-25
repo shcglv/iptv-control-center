@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-11-25
+
+### Added
+
+- **Channel identity catalog** — import the public channel catalog (iptv-org shape: `id`, `name`,
+  `alt_names`, `country`, `categories`, `logo`, `website`), then match channels by exact normalised
+  name or alias with a country tie-break (`uk` is treated as `gb`). Unmatched channels keep their
+  placeholder identity rather than being fuzzy-merged.
+- **Take-down blocks** — `catalog_id`, `tvg_id` or `name` hide a channel (playlist, guide and
+  resolver); `domain` disables a source. Blocks are idempotent and re-applicable.
+- `POST /api/v1/catalog/import`, `POST /api/v1/catalog/match`, `GET /api/v1/catalog/status`,
+  `GET/POST/DELETE /api/v1/blocklist`, and `scripts/catalog_import.py` for large files.
+
+### Changed
+
+- The resolver refuses hidden channels, so a block cannot be bypassed with a known public key.
+
 ## [0.2.1] — 2026-11-25
 
 Performance work measured at the top of the target range (10 000 channels, 30 000 streams,

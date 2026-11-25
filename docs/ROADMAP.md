@@ -101,7 +101,10 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] Candidate store with dedupe, encrypted URLs, masked display, credential flag
 - [x] Review API: run, list, accept (creates a Source), reject, status
 - [x] Discovery UI: run form, filter chips, masked candidate table, accept/reject
-- [ ] iptv-org catalog seeding + DMCA blocklist
+- [x] Channel identity catalog (iptv-org shape), exact name/alias matching with country tie-break
+- [x] Take-down blocks: catalog id, tvg id, name (hide channel) and domain (disable source)
+- [ ] Automatic catalog refresh on a schedule
+- [ ] iptv-org streams/EPG seeding (currently channels only)
 - [ ] Authenticated forum sessions (cookie import)
 - [ ] Scheduled re-crawls and change tracking of already-seen posts
 
