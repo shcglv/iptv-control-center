@@ -97,6 +97,7 @@ def main() -> int:
         "DROP DATABASE IF EXISTS iptv WITH (FORCE)",
     )
     docker("exec", PG, "psql", "-U", "postgres", "-c", "CREATE DATABASE iptv")
+    encryption_key = base64.b64encode(os.urandom(32)).decode()
     started = docker(
         "run",
         "-d",
