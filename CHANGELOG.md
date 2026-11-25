@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] — 2026-11-25
+
+XMLTV corpus hardening: 19 tests built from what providers actually emit.
+
+### Added
+
+- `tests/test_epg_corpus.py` — offset variants, truncated timestamps, DOCTYPE, a windows-1251
+  declaration, BOM and CRLF, CDATA, missing `stop`, broken timestamps, duplicate channel ids,
+  programmes for unknown channels, and re-import replacement.
+
+### Fixed
+
+- Timestamps written as `20261125180000+0300` (no space), `+03:00` (colon) or `Z` were rejected;
+  date-only and seconds-less stamps (`20261125`, `202611251800`) are now padded instead of dropped.
+- **DOCTYPE declarations were rejected.** Real XMLTV exports carry `<!DOCTYPE tv SYSTEM "xmltv.dtd">`,
+  so a plain guide could fail to import. They are now accepted: `no_network=True` means the DTD is
+  never fetched, and libxml2's amplification limits apply (`huge_tree=False`). The 50 MB document cap
+  remains, and its test now pins the guard instead of relying on libxml's text-node limit.
+- A document decoded to `str` but still declaring `encoding="windows-1251"` was re-encoded as UTF-8,
+  turning every non-ASCII name into mojibake. The declaration is now dropped before encoding.
+
 ## [0.3.1] — 2026-11-25
 
 Provider-corpus hardening: 17 tests built from realistic and hostile playlists.

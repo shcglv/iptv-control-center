@@ -113,7 +113,7 @@ src/iptvcc/          application package
 web/                 React + TypeScript SPA (Vite), built into src/iptvcc/static
 migrations/          Alembic
 scripts/             start.sh, check.ps1, smoke-container.ps1
-tests/               pytest (115) + Playwright browser tests
+tests/               pytest + Playwright browser tests + container acceptance tests
 docs/                architecture, roadmap, decisions
 ```
 

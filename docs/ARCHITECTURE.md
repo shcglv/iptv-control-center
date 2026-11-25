@@ -121,8 +121,13 @@ Programmes are stored as UTC epoch seconds — unambiguous on SQLite and Postgre
 
 - A source is **fully replaced** on every import (programmes are deleted, then re-inserted), which
   makes re-import idempotent and applies retention in the same pass.
-- `DOCTYPE` declarations are refused: XMLTV never needs them, and they are the entity-expansion
-  attack surface.
+- `DOCTYPE` is accepted, because real exports carry `<!DOCTYPE tv SYSTEM "xmltv.dtd">`. The DTD is
+  never fetched (`no_network=True`), entity amplification is limited by libxml2 (`huge_tree=False`)
+  and the document is capped at 50 MB, which covers the attack surface without rejecting guides.
+- Timestamps accept `+HHMM` or `+HH:MM`, with or without a space, `Z`, and truncated forms
+  (`YYYYMMDD`, `YYYYMMDDhhmm`) which are padded; an unparseable timestamp skips that programme only.
+- A document decoded to `str` has its `encoding=…` declaration dropped before UTF-8 encoding, so a
+  windows-1251 guide does not become mojibake.
 - Channel mapping: exact `tvg_id` first, then normalised display name. Manual mappings
   (`channel_epg_map.is_manual`) are never overwritten by an import.
 - The playlist emits the **mapped** guide id, so `tvg-id` in the M3U and `<channel id>` in the

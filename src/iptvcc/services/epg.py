@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import re
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -60,25 +61,46 @@ class EpgIngestStats:
         }
 
 
+_STAMP_RE = re.compile(r"(?P<stamp>\d{8,14})(?P<offset>[+-]\d{2}:?\d{2}|Z)?", re.IGNORECASE)
+_XML_DECL_RE = re.compile(r"^\s*<\?xml[^>]*\?>")
+
+
 def parse_xmltv_time(value: str, default_tz: str) -> int:
-    """Parse ``YYYYMMDDhhmmss [+HHMM]`` into UTC epoch seconds."""
-    raw = (value or "").strip()
+    """Parse ``YYYYMMDDhhmmss [+HHMM]`` into UTC epoch seconds.
+
+    Tolerates what providers actually emit: no space before the offset, ``+03:00`` with a colon,
+    ``Z``, and truncated stamps (date only, or without seconds). Anything else is an error the
+    caller turns into a skipped programme.
+    """
+    raw = (value or "").strip().lstrip("\ufeff")
     if not raw:
         raise XmltvError("empty datetime")
-    parts = raw.split()
+
+    compact = re.sub(r"\s+", "", raw)
+    match = _STAMP_RE.fullmatch(compact)
+    if match is None:
+        raise XmltvError(f"bad XMLTV datetime: {value!r}")
+
+    stamp = match.group("stamp")
+    if len(stamp) not in (8, 10, 12, 14):
+        raise XmltvError(f"bad XMLTV datetime: {value!r}")
+    padded = stamp.ljust(14, "0")
     try:
-        naive = datetime.strptime(parts[0], _XMLTV_FORMAT)
+        naive = datetime.strptime(padded, "%Y%m%d%H%M%S")
     except ValueError as exc:
         raise XmltvError(f"bad XMLTV datetime: {value!r}") from exc
-    if len(parts) > 1:
-        offset = parts[1]
-        try:
-            sign = -1 if offset.startswith("-") else 1
-            digits = offset.lstrip("+-")
-            hours, minutes = int(digits[:2]), int(digits[2:4] or 0)
-        except (ValueError, IndexError) as exc:
-            raise XmltvError(f"bad XMLTV offset: {offset!r}") from exc
+
+    offset = match.group("offset")
+    if offset:
+        if offset.upper() == "Z":
+            return int(naive.replace(tzinfo=UTC).timestamp())
+        sign = -1 if offset.startswith("-") else 1
+        digits = offset.lstrip("+-").replace(":", "")
+        hours, minutes = int(digits[:2]), int(digits[2:4])
+        if hours > 23 or minutes > 59:
+            raise XmltvError(f"bad XMLTV offset: {offset!r}")
         return int(naive.replace(tzinfo=UTC).timestamp()) - sign * (hours * 3600 + minutes * 60)
+
     try:
         zone: tzinfo = ZoneInfo(default_tz)
     except Exception:
@@ -102,10 +124,20 @@ def format_xmltv_time(epoch: int) -> str:
 def _guard_document(data: bytes) -> None:
     if len(data) > MAX_DOCUMENT_BYTES:
         raise XmltvError("document is too large")
-    head = data[:4096].lower()
-    if b"<!doctype" in head:
-        # External entity expansion is never needed for XMLTV; refuse rather than harden.
-        raise XmltvError("DOCTYPE declarations are not allowed")
+
+
+def _normalise_text_document(data: str) -> bytes:
+    """Encode a decoded document for parsing, dropping a stale encoding declaration.
+
+    A windows-1251 document decoded to ``str`` by netguard must not be re-encoded as UTF-8 while
+    still declaring windows-1251, or every non-ASCII name becomes mojibake.
+    """
+    text = data.lstrip("\ufeff")
+    declaration = _XML_DECL_RE.match(text)
+    if declaration is not None and "encoding" in declaration.group(0).lower():
+        cleaned = re.sub(r'\s+encoding\s*=\s*["\'][^"\']*["\']', "", declaration.group(0))
+        text = cleaned + text[declaration.end() :]
+    return text.encode("utf-8")
 
 
 def _release(element: etree._Element) -> None:
@@ -125,8 +157,11 @@ def iter_xmltv(data: bytes | str, default_tz: str) -> Iterator[tuple[str, dict[s
     ``<display-name>`` before its parent ``<channel>`` is read.
     """
     if isinstance(data, str):
-        data = data.encode("utf-8")
+        data = _normalise_text_document(data)
     _guard_document(data)
+    # DOCTYPE is common in XMLTV exports, so it is allowed. Entity expansion limits come from
+    # libxml2 (huge_tree=False) and no_network=True, so a DTD is never fetched and a "billion
+    # laughs" document hits the amplification limit instead of the database.
     context = etree.iterparse(
         BytesIO(data), events=("end",), huge_tree=False, no_network=True, recover=False
     )

@@ -151,17 +151,39 @@ async def test_retention_prunes_old_programmes(
 
 
 @pytest.mark.asyncio
-async def test_doctype_is_rejected(session_factory: async_sessionmaker[AsyncSession]) -> None:
+async def test_doctype_is_accepted_without_fetching_the_dtd(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Real XMLTV exports carry a DOCTYPE; no_network=True means the SYSTEM URL is never fetched."""
+    document = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<!DOCTYPE tv SYSTEM "http://127.0.0.1:9/xmltv.dtd">'
+        b'<tv><channel id="a.test"><display-name>A</display-name></channel>'
+        b'<programme start="20261125180000 +0000" channel="a.test"><title>T</title></programme></tv>'
+    )
     async with session_factory() as session:
         source = EpgSource(name="Guide")
         session.add(source)
         await session.flush()
-        with pytest.raises(XmltvError, match="DOCTYPE"):
-            await ingest_xmltv(
-                session,
-                source,
-                b'<?xml version="1.0"?><!DOCTYPE tv SYSTEM "http://evil/x.dtd"><tv/>',
-            )
+        stats = await ingest_xmltv(session, source, document)
+        await session.commit()
+        assert stats.channels == 1
+        assert stats.programmes == 1
+
+
+@pytest.mark.asyncio
+async def test_oversized_document_is_rejected(
+    session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from iptvcc.services import epg as epg_module
+
+    monkeypatch.setattr(epg_module, "MAX_DOCUMENT_BYTES", 1024, raising=False)
+    async with session_factory() as session:
+        source = EpgSource(name="Guide")
+        session.add(source)
+        await session.flush()
+        with pytest.raises(XmltvError, match="too large"):
+            await ingest_xmltv(session, source, b"<tv>" + b" " * 4096 + b"</tv>")
 
 
 @pytest.mark.asyncio
