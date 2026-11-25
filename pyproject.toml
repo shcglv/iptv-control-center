@@ -56,6 +56,7 @@ testpaths = ["tests"]
 markers = [
     "browser: needs Chromium; set IPTV_BROWSER_TESTS=1 to run",
     "container: needs Docker; set IPTV_CONTAINER_TESTS=1 to run",
+    "network: needs the internet; set IPTV_NETWORK_TESTS=1 to run",
 ]
 filterwarnings = ["error::DeprecationWarning:iptvcc.*"]
 
