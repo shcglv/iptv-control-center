@@ -109,7 +109,7 @@ def main() -> int:
         "-e",
         "IPTV_APP_ENV=test",
         "-e",
-        "IPTV_ENCRYPTION_KEY=YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=",
+        f"IPTV_ENCRYPTION_KEY={encryption_key}",
         "-e",
         "IPTV_DATABASE_URL=postgresql+psycopg://postgres:test@iptv-pg:5432/iptv",
         "-e",
