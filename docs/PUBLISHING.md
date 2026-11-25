@@ -1,0 +1,65 @@
+# Publishing the repository
+
+The code exists only on this workstation. CI has never run, and Coolify cannot build from a local
+directory — it needs a Git remote. This is the missing step, and it needs your GitHub credentials.
+
+A complete history bundle is prepared next to the project:
+
+```
+C:\Users\shcgl\Desktop\iptv-control-center-1.0.0.bundle
+```
+
+Verified: `git bundle verify` reports *"The bundle records a complete history"*, containing
+`refs/heads/main` at `0d6a9d4` and tag `v1.0.0`.
+
+## 1. Create an empty repository
+
+On GitHub, create a repository — private is fine — with **no** README, license or `.gitignore`
+(those already exist here). Note the URL, e.g. `git@github.com:shcglv/iptv-control-center.git`.
+
+## 2. Push from this workstation
+
+```powershell
+cd C:\Users\shcgl\Desktop\IPTV-CONTROL-CENTER
+git remote add origin git@github.com:shcglv/iptv-control-center.git
+git push -u origin main
+git push origin v1.0.0
+```
+
+If SSH is not set up, use HTTPS and a personal access token instead:
+
+```powershell
+git remote add origin https://github.com/shcglv/iptv-control-center.git
+git push -u origin main
+```
+
+## 3. If the workstation is lost
+
+The bundle restores everything:
+
+```powershell
+git clone C:\Users\shcgl\Desktop\iptv-control-center-1.0.0.bundle iptv-control-center
+cd iptv-control-center
+git remote add origin git@github.com:shcglv/iptv-control-center.git
+git push -u origin main --tags
+```
+
+## 4. Connect Coolify
+
+Coolify builds through a GitHub App, per the established setup (`shcglv-repo`):
+
+1. Install the GitHub App on the new repository.
+2. Coolify → Application → source: the repository, branch `main`, build pack `Dockerfile`.
+3. Continue with [`DEPLOYMENT.md`](DEPLOYMENT.md) from step 2.
+
+## 5. First CI run
+
+The workflow at `.github/workflows/ci.yml` runs on push to `main`: backend on SQLite, backend on
+PostgreSQL 16, web build, image build, and the container acceptance suite. It has never executed —
+the first push is also its first test. If a job fails, the log is the next debugging session.
+
+## What is *not* in the bundle
+
+- `data/` (scratch databases, benchmarks, live-check scripts) — regenerated locally.
+- `src/iptvcc/static/` and `web/node_modules/` — built by CI and by the Dockerfile.
+- `.env` files — only `.env.example` is tracked.
