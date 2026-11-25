@@ -1,8 +1,7 @@
 # Verification report
 
 **Date:** 2026-11-25
-**Version:** 0.5.0
-**Commit:** `d484a86`
+**Version:** 1.0.0 (tagged `v1.0.0`)
 **Environment:** Windows development machine, Python 3.12.0, Docker 29.9.3, Chromium via Playwright
 **Database under test:** SQLite **and PostgreSQL 16** — the full suite passes on both
 
@@ -13,14 +12,14 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 
 | Area | Command | Result |
 |---|---|---|
-| Backend (SQLite) | `pytest -q` | **231 passed**, 9 skipped |
-| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **231 passed**, 9 skipped |
-| Backup (PostgreSQL) | `data/live_pg_backup_drill.py` | **PASSED** — 5/1/5 rows seeded, 71 KB dump, 27 table entries, restored counts identical |
-| Lint | `ruff check src tests` | clean |
+| Backend (SQLite) | `pytest -q` | **232 passed**, 9 skipped |
+| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **232 passed**, 9 skipped |
+| Backup (PostgreSQL) | `scripts/verify_pg_container.py` | **PASSED** — migrations at start, import, 302 resolver, restart persistence, 73 KB dump with 27 table entries |
+| Lint | `ruff check src tests scripts` | clean |
 | Types | `mypy src` | clean, 39 files |
 | Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | **6 passed** |
 | Container | `pytest tests/test_container.py` (`IPTV_CONTAINER_TESTS=1`) | **3 passed**, image rebuilt from HEAD |
-| Restore (SQLite) | `data/live_restore_drill.py` | **PASSED** (last run) |
+| Restore (SQLite) | `data/live_restore_drill.py` | **PASSED** |
 | Preflight | `scripts/preflight.py` | 8/8 with a valid key; fails correctly without one |
 | Performance | `scripts/bench_scale.py --channels 3000 ...` | import 1.78 s, render 0.34 s, EPG 12.4 s, guide 4.5 s |
 

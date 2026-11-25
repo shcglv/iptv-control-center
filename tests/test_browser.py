@@ -22,6 +22,7 @@ import urllib.request
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -48,6 +49,13 @@ M3U = (
     '#EXTINF:-1 tvg-id="cnn.us" group-title="News",CNN\nhttp://p.test/cnn.m3u8\n'
     '#EXTINF:-1 group-title="Sport",Eurosport 1\nhttp://p.test/euro.ts\n'
 )
+
+
+def _new_page(browser: Any) -> Any:
+    """A page with a generous default timeout: these tests run on loaded machines."""
+    page = browser.new_page(viewport={"width": 1280, "height": 900})  # type: ignore[attr-defined]
+    page.set_default_timeout(30_000)
+    return page
 
 
 def _seed_catalog(base: str, secret: str) -> None:
@@ -162,7 +170,7 @@ def test_login_renders_dashboard_and_navigation(
     base, secret = live_server
     with playwright_api.sync_playwright() as playwright:
         browser = playwright.chromium.launch()
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page = _new_page(browser)
         errors: list[str] = []
         page.on("pageerror", lambda exc: errors.append(str(exc)))
 
@@ -208,7 +216,7 @@ def test_profile_editor_hides_a_channel(live_server: tuple[str, str], tmp_path: 
 
     with playwright_api.sync_playwright() as playwright:
         browser = playwright.chromium.launch()
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page = _new_page(browser)
         page.goto(base, wait_until="domcontentloaded")
         page.wait_for_selector("#email", timeout=15_000)
         page.fill("#email", "admin@local")
@@ -281,7 +289,7 @@ def test_channel_diagnostics_panel(live_server: tuple[str, str], tmp_path: Path)
 
     with playwright_api.sync_playwright() as playwright:
         browser = playwright.chromium.launch()
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page = _new_page(browser)
         page.goto(base, wait_until="domcontentloaded")
         page.wait_for_selector("#email", timeout=15_000)
         page.fill("#email", "admin@local")
@@ -314,7 +322,7 @@ def test_profile_reorder_by_drag_and_drop(live_server: tuple[str, str], tmp_path
 
     with playwright_api.sync_playwright() as playwright:
         browser = playwright.chromium.launch()
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page = _new_page(browser)
         page.goto(base, wait_until="domcontentloaded")
         page.wait_for_selector("#email", timeout=15_000)
         page.fill("#email", "admin@local")
@@ -387,7 +395,7 @@ def test_catalog_import_and_block(live_server: tuple[str, str], tmp_path: Path) 
 
     with playwright_api.sync_playwright() as playwright:
         browser = playwright.chromium.launch()
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page = _new_page(browser)
         page.goto(base, wait_until="domcontentloaded")
         page.wait_for_selector("#email", timeout=15_000)
         page.fill("#email", "admin@local")
@@ -431,7 +439,7 @@ def test_discovery_reviews_a_candidate(
 
     with playwright_api.sync_playwright() as playwright:
         browser = playwright.chromium.launch()
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page = _new_page(browser)
         page.goto(base, wait_until="domcontentloaded")
         page.wait_for_selector("#email", timeout=15_000)
         page.fill("#email", "admin@local")

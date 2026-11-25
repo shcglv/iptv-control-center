@@ -1,9 +1,10 @@
 # Status against the specification
 
-**Version 0.5.0 · commit `d484a86` · 2026-11-25**
+**Version 1.0.0 · 2026-11-25 · tagged `v1.0.0`**
 
 What exists, what does not, and how each claim is verified. "Verified" means a test or a recorded
 run proves it; "implemented" means the code exists but no test or run has exercised it end to end.
+Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 
 ## Core product
 

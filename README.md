@@ -4,13 +4,13 @@ Self-hosted control plane for IPTV: sources, a single channel catalog, EPG, qual
 per-device playlists. **Video never transits the server** — playlists point at provider URLs, and the
 server's only role in playback is an optional HTTP 302 that picks the best source at request time.
 
-> **Status: `0.2.0`.** Working: M3U import → channel catalog → playlist profiles (visibility,
-> order, source pins) → per-device playlist → quality-aware 302 source resolution → XMLTV ingest
-> with channel mapping and per-device guide output, autonomous health probing, source discovery
-> with a review queue, Telegram bot, admin login with TOTP, and a React web UI with seven screens.
-> CI builds the image and smoke-tests it. Not yet: iptv-org catalog seeding, active ffprobe mode,
-> deployment to the owner's Coolify server. See [`docs/ROADMAP.md`](docs/ROADMAP.md) and
-> [`CHANGELOG.md`](CHANGELOG.md).
+> **Status: `1.0.0`.** M3U import → channel catalog → playlist profiles (visibility, ordering,
+> drag-and-drop, source pins) → per-device playlist → quality-aware 302 source resolution → XMLTV
+> ingest with channel mapping and per-device guide → discovery with a review queue and a channel
+> identity catalog → Telegram bot → nine-screen React UI. Verified on SQLite and PostgreSQL, in a
+> browser, and inside the container; backups drilled on both databases.
+> **Not yet deployed** — see [`RELEASE.md`](RELEASE.md) for the ten install steps and
+> [`docs/STATUS.md`](docs/STATUS.md) for what is deliberately absent.
 
 ## What it does today
 

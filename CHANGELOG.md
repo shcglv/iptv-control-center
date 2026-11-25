@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-11-25
+
+First release verified as an artifact. Not deployed; see [`RELEASE.md`](RELEASE.md).
+
+### Verified for this release
+
+| Suite | Result |
+|---|---|
+| Backend on SQLite | 232 passed, 9 skipped |
+| Backend on PostgreSQL 16 | 232 passed, 9 skipped |
+| Browser (Chromium, real server) | 6 passed |
+| Container acceptance (image rebuilt from HEAD) | 3 passed |
+| PostgreSQL container drill | passed — migrations at start, import, 302, restart persistence, 73 KB dump with 27 tables |
+| SQLite restore drill | passed |
+| ruff / mypy strict | clean |
+
+### Changed
+
+- Browser tests use a 30 s default timeout: one catalog test failed once while a Docker build starved
+  the machine, and a loaded CI runner is not a product failure.
+- Version 1.0.0 across the package and the image.
+
 ## [0.5.2] — 2026-11-25
 
 ### Added
