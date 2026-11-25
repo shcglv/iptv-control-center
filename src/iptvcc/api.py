@@ -53,6 +53,7 @@ from .models import (
 )
 from .netguard import UnsafeUrlError, fetch_text
 from .quality import compute
+from .ratelimit import public_rate_limit
 from .secrets import decrypt, mask_url
 from .security import generate_device_token, hash_token, token_prefix
 from .services.delivery import build_playlist, get_active_assignment, resolve_stream
@@ -623,12 +624,12 @@ async def epg_status(session: SessionDep, _: AdminDep) -> EpgStatusOut:
     )
 
 
-@app.get("/p/{token}/epg.xml", tags=["delivery"])
+@app.get("/p/{token}/epg.xml", tags=["delivery"], dependencies=[Depends(public_rate_limit)])
 async def device_epg(token: str, session: SessionDep) -> FileResponse:
     return await _serve_epg(token, session, gzipped=False)
 
 
-@app.get("/p/{token}/epg.xml.gz", tags=["delivery"])
+@app.get("/p/{token}/epg.xml.gz", tags=["delivery"], dependencies=[Depends(public_rate_limit)])
 async def device_epg_gzip(token: str, session: SessionDep) -> FileResponse:
     return await _serve_epg(token, session, gzipped=True)
 
@@ -1230,7 +1231,12 @@ async def run_scheduler_tick(request: Request, _: AdminDep) -> SchedulerTickOut:
 # --- delivery ----------------------------------------------------------------------------------
 
 
-@app.get("/p/{token}/live.m3u", response_class=PlainTextResponse, tags=["delivery"])
+@app.get(
+    "/p/{token}/live.m3u",
+    response_class=PlainTextResponse,
+    tags=["delivery"],
+    dependencies=[Depends(public_rate_limit)],
+)
 async def device_playlist(token: str, request: Request, session: SessionDep) -> PlainTextResponse:
     base_url = get_settings().public_base_url or str(request.base_url).rstrip("/")
     playlist = await build_playlist(session, token, base_url)
@@ -1243,7 +1249,11 @@ async def device_playlist(token: str, request: Request, session: SessionDep) -> 
     )
 
 
-@app.get("/p/{token}/s/{public_key}.{ext}", tags=["delivery"])
+@app.get(
+    "/p/{token}/s/{public_key}.{ext}",
+    tags=["delivery"],
+    dependencies=[Depends(public_rate_limit)],
+)
 async def resolve(token: str, public_key: str, ext: str, session: SessionDep) -> RedirectResponse:
     assignment = await get_active_assignment(session, token)
     if assignment is None:

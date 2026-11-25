@@ -122,10 +122,15 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [ ] Re-measure on PostgreSQL and on the target server
 - [ ] Profile-based playlist render cache if a cold 1.5 s playlist becomes a problem
 
-## P10 — Hardening — `[ ]`
+## P10 — Hardening — `[~]`
 
-SSRF suite, rate limits, log audit, restore drill, accessibility and visual regression, full Coolify
-checklist, runbook.
+- [x] SSRF test suite (schemes, credentials, private ranges, metadata, LAN switch)
+- [x] Public endpoint rate limiting with `Retry-After`
+- [x] Backup tooling with integrity verification, plus an executed restore drill
+- [x] Operations runbook (`docs/RUNBOOK.md`)
+- [ ] Log audit and request IDs
+- [ ] Accessibility and visual regression checks in CI
+- [ ] Full Coolify checklist execution (blocked on deployment GO)
 
 ## P11 — Extensions — `[ ]`
 

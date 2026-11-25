@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # SSRF policy. Private targets are refused by default; enable deliberately for LAN sources.
     allow_private_network_targets: bool = False
 
+    # Public delivery endpoints (/p/...). Per token and client address, sliding 60 s window.
+    # Set to 0 to disable (a player fetches the playlist once, then one resolve per zap).
+    public_rate_limit_per_minute: int = 120
+
     # Rendered playlists/guides and other generated files.
     artifacts_dir: str = "./data/artifacts"
 

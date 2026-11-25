@@ -24,9 +24,25 @@ _BLOCKED_HOSTNAMES = {
     "metadata",
 }
 
+# Link-local and cloud-metadata addresses are refused even when LAN targets are allowed: the
+# ``allow_private`` switch exists for a NAS on the local network, not for reaching 169.254.169.254.
+_ALWAYS_BLOCKED_NETWORKS = (
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("fe80::/10"),
+    ipaddress.ip_network("fd00:ec2::254/128"),
+)
+
 
 class UnsafeUrlError(ValueError):
     """Raised when a URL must not be fetched."""
+
+
+def _is_metadata_address(address: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return True
+    return any(ip in network for network in _ALWAYS_BLOCKED_NETWORKS)
 
 
 def _is_blocked_ip(address: str) -> bool:
@@ -78,6 +94,8 @@ async def resolve_and_check(url: str) -> None:
         raise UnsafeUrlError("host did not resolve")
     for info in infos:
         address = str(info[4][0])
+        if _is_metadata_address(address):
+            raise UnsafeUrlError(f"host resolves to a link-local or metadata address: {address}")
         if _is_blocked_ip(address) and not allow_private:
             raise UnsafeUrlError(f"host resolves to a non-global address: {address}")
 

@@ -64,6 +64,8 @@ Measured baselines on the host: postgres 15.9 MB RSS, comparable Python APIs 11â
 | `services/profiles.py` | effective lineup per playlist profile (visibility, order, pins) |
 | `services/delivery.py` | per-device playlist rendering, 302 resolver |
 | `services/discovery/` | extractors, RSS/HTML adapters, candidate store |
+| `ratelimit.py` | sliding-window limits for the public `/p/â€¦` endpoints |
+| `backup.py` | online SQLite backup, `pg_dump` for PostgreSQL, verification |
 | `telegram/` | Bot API adapter, long-polling bot, notification scan |
 | `api.py` | HTTP surface: admin API, `/p/...`, `/healthz`, SPA |
 | `web/` | React + TypeScript SPA (Vite), built into `src/iptvcc/static` |
@@ -250,9 +252,11 @@ Adapters fetch through `netguard`, so SSRF rules apply to discovery exactly as t
 | Admin surface | Argon2id password + TOTP, server-side sessions (opaque token, SHA-256 at rest, 12 h TTL), `HttpOnly`/`SameSite=Lax` cookie, CSRF header on every unsafe method, 5 attempts/min login guard |
 | Device access | 32-byte opaque token, SHA-256 at rest, prefix for lookup, instant revocation |
 | Credentials at rest | AES-256-GCM (`IPTV_ENCRYPTION_KEY`, 32 bytes base64) |
-| SSRF | scheme allowlist, DNS resolution check, redirect re-check, 50 MB cap, metadata hosts denied |
+| SSRF | scheme allowlist, DNS resolution check, redirect re-check, 50 MB cap, metadata hosts denied; link-local and cloud-metadata addresses stay blocked even when LAN targets are enabled |
+| Public endpoints | sliding-window limit of 120 requests/min per device token and client address; `429` with `Retry-After` |
 | Logs | `mask_url()` keeps scheme+host only |
 | Container | non-root UID 10001, no build tools in the final layer, healthcheck |
+| Backups | online SQLite backup / `pg_dump` custom format, integrity verified before the file is accepted |
 
 ## 8. Deployment
 

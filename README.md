@@ -117,6 +117,17 @@ tests/               pytest (115) + Playwright browser tests
 docs/                architecture, roadmap, decisions
 ```
 
+## Operations
+
+Backup, restore, upgrade, secret rotation, monitoring and incident playbooks live in
+[`docs/RUNBOOK.md`](docs/RUNBOOK.md). Performance numbers are in
+[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
+
+```powershell
+# database backup (SQLite online backup / pg_dump custom format)
+.\.venv\Scripts\python.exe scripts\backup.py --out backups\iptv.dump
+```
+
 ## Quality gates
 
 CI runs exactly these steps (`.github/workflows/ci.yml`): backend lint, types and tests; web

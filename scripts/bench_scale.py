@@ -24,13 +24,13 @@ os.environ.setdefault("IPTV_SCHEDULER_ENABLED", "false")
 os.environ.setdefault("IPTV_TELEGRAM_ENABLED", "false")
 os.environ.setdefault("IPTV_APP_ENV", "test")
 
-from iptvcc import db  # noqa: E402
-from iptvcc.config import get_settings  # noqa: E402
-from iptvcc.models import Assignment, Device, PlaylistProfile, Source  # noqa: E402
-from iptvcc.services.delivery import build_playlist  # noqa: E402
-from iptvcc.services.epg import build_guide, ingest_xmltv, map_channels  # noqa: E402
-from iptvcc.services.importing import import_playlist  # noqa: E402
-from iptvcc.security import hash_token  # noqa: E402
+from iptvcc import db
+from iptvcc.config import get_settings
+from iptvcc.models import Assignment, Device, PlaylistProfile, Source
+from iptvcc.security import hash_token
+from iptvcc.services.delivery import build_playlist
+from iptvcc.services.epg import build_guide, ingest_xmltv, map_channels
+from iptvcc.services.importing import import_playlist
 
 
 def build_m3u(channels: int, sources: int) -> str:
@@ -51,7 +51,9 @@ def build_xmltv(channels: int, programmes: int, start: datetime) -> str:
     stamp = lambda moment: moment.strftime("%Y%m%d%H%M%S +0000")  # noqa: E731
     parts = ['<?xml version="1.0" encoding="UTF-8"?>', "<tv>"]
     for index in range(channels):
-        parts.append(f'<channel id="ch{index}.test"><display-name>Channel {index:05d}</display-name></channel>')
+        parts.append(
+            f'<channel id="ch{index}.test"><display-name>Channel {index:05d}</display-name></channel>'
+        )
     for index in range(channels):
         for slot in range(programmes):
             begin = start + timedelta(minutes=30 * slot)
@@ -88,7 +90,9 @@ async def run(channels: int, sources: int, epg_channels: int, programmes: int) -
 
     async with db.get_session_factory()() as session:
         m3u = build_m3u(channels, sources)
-        print(f"m3u size: {len(m3u) / 1024 / 1024:.2f} MiB, {channels} channels x {sources} streams")
+        print(
+            f"m3u size: {len(m3u) / 1024 / 1024:.2f} MiB, {channels} channels x {sources} streams"
+        )
 
         started = time.perf_counter()
         source = Source(name="Bench", url="http://bench.test/list.m3u")
@@ -97,12 +101,20 @@ async def run(channels: int, sources: int, epg_channels: int, programmes: int) -
         stats = await import_playlist(session, source, m3u)
         await session.commit()
         first_import = time.perf_counter() - started
-        results.append(("import (cold)", first_import, f"{stats.channels_created} channels, {stats.created} streams"))
+        results.append(
+            (
+                "import (cold)",
+                first_import,
+                f"{stats.channels_created} channels, {stats.created} streams",
+            )
+        )
 
         started = time.perf_counter()
         stats_again = await import_playlist(session, source, m3u)
         await session.commit()
-        results.append(("import (re-run)", time.perf_counter() - started, f"{stats_again.unchanged} unchanged"))
+        results.append(
+            ("import (re-run)", time.perf_counter() - started, f"{stats_again.unchanged} unchanged")
+        )
 
         profile = PlaylistProfile(name="Bench", is_default=True)
         session.add(profile)
@@ -139,7 +151,9 @@ async def run(channels: int, sources: int, epg_channels: int, programmes: int) -
         if epg_channels:
             start = datetime.now(UTC).replace(second=0, microsecond=0)
             xml = build_xmltv(epg_channels, programmes, start)
-            print(f"xmltv size: {len(xml) / 1024 / 1024:.2f} MiB, {epg_channels * programmes} programmes")
+            print(
+                f"xmltv size: {len(xml) / 1024 / 1024:.2f} MiB, {epg_channels * programmes} programmes"
+            )
 
             started = time.perf_counter()
             from iptvcc.models import EpgSource
@@ -161,7 +175,9 @@ async def run(channels: int, sources: int, epg_channels: int, programmes: int) -
             )
 
             started = time.perf_counter()
-            written = await build_guide(session, "bench-token", Path(settings.artifacts_dir) / "bench")
+            written = await build_guide(
+                session, "bench-token", Path(settings.artifacts_dir) / "bench"
+            )
             elapsed = time.perf_counter() - started
             if written is None:
                 results.append(("guide build", elapsed, "no guide produced"))
