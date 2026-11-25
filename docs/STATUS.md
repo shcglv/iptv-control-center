@@ -27,7 +27,7 @@ Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 | XMLTV ingest: streaming, timezone offsets, retention, replace | ✅ | 19-test EPG corpus; **real public guide**: 287 channels, 48 814 programmes from a 20.9 MiB file (`REAL-WORLD.md`) |
 | Channel↔EPG mapping, mapped ids emitted in the playlist | ✅ | `test_epg.py`, container test |
 | Per-device guide, cached per profile | ✅ | container test, `test_profiles.py` |
-| Smart-TV guide size cap | ❌ not implemented | — |
+| Smart-TV guide size cap | ✅ | renders 7→3→1-day windows until the document fits `IPTV_EPG_MAX_BYTES` (5 MB default), never truncating XML; `test_epg_cap.py` |
 | Health probes, aggregates, composite score | ✅ | `test_health.py` |
 | Anti-flapping (+10 margin, 15-min dwell) | ✅ | `test_quality.py`, `test_scheduler.py` |
 | Autonomous scheduler with DB lease and watchdog | ✅ | `test_scheduler.py` |

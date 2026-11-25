@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-11-25
+
+### Added
+
+- **Smart-TV guide cap** (`IPTV_EPG_MAX_BYTES`, 5 MB default): when a device guide would exceed the
+  cap, it is re-rendered with a narrower window — 7 days → 3 → 1 — instead of being truncated, so
+  the document is always well-formed XML. Many TVs refuse or freeze on guides of tens of megabytes,
+  and at 10 000 channels the full window reached 39 MB.
+- If even a one-day window exceeds the cap, the size is logged and served rather than silently
+  dropped: an oversized guide is better than no guide.
+
+### Changed
+
+- Guide rendering is split into `_render_guide` (one window) and `build_guide` (window selection),
+  which is what makes the retry possible without buffering the document in memory.
+
 ## [1.0.2] — 2026-11-25
 
 ### Fixed

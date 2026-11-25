@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import logging
 import re
 import time
 from collections.abc import Iterator
@@ -31,6 +32,8 @@ from ..matching import normalize
 from ..models import Channel, ChannelEpgMap, EpgChannel, EpgSource, Programme
 from .delivery import get_active_assignment
 from .profiles import visible_channels
+
+logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 2000
 _GUIDE_CHUNK = 200
@@ -381,12 +384,17 @@ async def build_guide(
     days_back: int = 1,
     days_forward: int = 7,
     cache_key: str | None = None,
+    max_bytes: int | None = None,
 ) -> tuple[Path, Path] | None:
     """Render the device guide to ``out_dir`` and return ``(xml_path, gzip_path)``.
 
     ``cache_key`` defaults to a hash of the token, but callers that share the rendered file between
     devices on the same playlist profile pass a profile-scoped key: the guide depends on the
     profile, not on the device.
+
+    ``max_bytes`` caps the document for players that choke on large guides (many TVs). The renderer
+    retries with a narrower time window instead of truncating mid-document, so the result is always
+    well-formed XML.
     """
     entries = await epg_ids_for_assignment(session, token)
     if entries is None:
@@ -398,9 +406,44 @@ async def build_guide(
     gz_path = out_dir / f"{key}.xml.gz"
 
     now = int(time.time())
-    window_start = now - days_back * 86_400
-    window_end = now + days_forward * 86_400
+    windows: list[tuple[int, int]] = [(days_back, days_forward)]
+    if max_bytes and max_bytes > 0:
+        for candidate in ((days_back, 3), (0, 1)):
+            if candidate[1] < windows[-1][1] or candidate[0] < windows[-1][0]:
+                windows.append(candidate)
 
+    for attempt, (back, forward) in enumerate(windows):
+        window_start = now - back * 86_400
+        window_end = now + forward * 86_400
+        await _render_guide(session, entries, xml_path, window_start, window_end)
+        size = xml_path.stat().st_size
+        if not max_bytes or max_bytes <= 0 or size <= max_bytes:
+            break
+        if attempt == len(windows) - 1:
+            # Even the narrowest window exceeds the cap: keep it, but say so.
+            logger.warning(
+                "guide for profile %s is %s bytes even with a %s-day window (cap %s)",
+                key,
+                size,
+                forward,
+                max_bytes,
+            )
+
+    with open(xml_path, "rb") as raw, gzip.open(gz_path, "wb", compresslevel=6) as compressed:
+        while block := raw.read(1024 * 1024):
+            compressed.write(block)
+
+    return xml_path, gz_path
+
+
+async def _render_guide(
+    session: AsyncSession,
+    entries: list[tuple[str, int, str, str | None]],
+    xml_path: Path,
+    window_start: int,
+    window_end: int,
+) -> None:
+    """Write one XMLTV document for the given time window."""
     with etree.xmlfile(str(xml_path), encoding="utf-8") as xf:
         xf.write_declaration()
         with xf.element("tv", {"generator-info-name": f"iptv-control-center/{__version__}"}):
@@ -456,9 +499,3 @@ async def build_guide(
                         if programme.category:
                             etree.SubElement(element, "category").text = programme.category
                         xf.write(element)
-
-    with open(xml_path, "rb") as raw, gzip.open(gz_path, "wb", compresslevel=6) as compressed:
-        while block := raw.read(1024 * 1024):
-            compressed.write(block)
-
-    return xml_path, gz_path

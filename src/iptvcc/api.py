@@ -663,7 +663,13 @@ async def _serve_epg(token: str, session: AsyncSession, *, gzipped: bool) -> Fil
 
     fresh = xml_path.exists() and (time.time() - xml_path.stat().st_mtime) < 300
     if not fresh:
-        rendered = await build_guide(session, token, out_dir, cache_key=key)
+        rendered = await build_guide(
+            session,
+            token,
+            out_dir,
+            cache_key=key,
+            max_bytes=get_settings().epg_max_bytes,
+        )
         if rendered is None:
             raise HTTPException(status_code=404, detail="unknown or revoked token")
         xml_path, gz_path = rendered

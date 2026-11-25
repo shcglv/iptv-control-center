@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout_seconds: int = 12
 
+    # Smart-TV guard: guides larger than this are re-rendered with a narrower window.
+    # 0 disables the cap.
+    epg_max_bytes: int = 5000000
+
     # Telegram bot. Without a token the bot is disabled; polling needs no inbound port.
     telegram_bot_token: str = ""
     telegram_enabled: bool = True

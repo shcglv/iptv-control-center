@@ -133,7 +133,10 @@ Programmes are stored as UTC epoch seconds — unambiguous on SQLite and Postgre
 - The playlist emits the **mapped** guide id, so `tvg-id` in the M3U and `<channel id>` in the
   XMLTV always agree — the join every player depends on.
 - `GET /p/<token>/epg.xml` and `.xml.gz` render the device's own channel subset, cached for 5
-  minutes on disk keyed by a hash of the token (the token itself never appears in a filename).
+  minutes on disk keyed by a profile hash (the token itself never appears in a filename).
+- **Smart-TV cap**: if the document exceeds `IPTV_EPG_MAX_BYTES` (5 MB default), the guide is
+  re-rendered with a narrower window — 7 days → 3 → 1 — rather than truncated. The file is always
+  well-formed XML; when even one day exceeds the cap the size is logged and kept.
 
 ## 6.3 Health, quality and selection
 
