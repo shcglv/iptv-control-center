@@ -132,10 +132,11 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] Public endpoint rate limiting with `Retry-After`
 - [x] Backup tooling with integrity verification, plus an executed restore drill
 - [x] Container acceptance test: the built image is exercised end to end, including restart persistence
-- [x] Operations runbook (`docs/RUNBOOK.md`)
+- [x] Operations runbook (`docs/RUNBOOK.md`) and preflight checks (`scripts/preflight.py`)
+- [x] Owner acceptance script (`docs/ACCEPTANCE.md`) and deployment plan (`docs/DEPLOYMENT.md`)
 - [ ] Log audit and request IDs
 - [ ] Accessibility and visual regression checks in CI
-- [ ] Full Coolify checklist execution (blocked on deployment GO)
+- [ ] Execute the deployment plan (blocked: needs owner GO)
 
 ## P11 — Extensions — `[ ]`
 

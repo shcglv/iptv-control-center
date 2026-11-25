@@ -120,10 +120,15 @@ docs/                architecture, roadmap, decisions
 ## Operations
 
 Backup, restore, upgrade, secret rotation, monitoring and incident playbooks live in
-[`docs/RUNBOOK.md`](docs/RUNBOOK.md). Performance numbers are in
+[`docs/RUNBOOK.md`](docs/RUNBOOK.md). Deployment to Coolify is planned in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (not executed), and the manual pass with a real provider
+and a real TV is [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md). Performance numbers are in
 [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
 ```powershell
+# pre-deployment checks: key, URL, timezone, telegram, database, migrations
+.\.venv\Scripts\python.exe scripts\preflight.py
+
 # database backup (SQLite online backup / pg_dump custom format)
 .\.venv\Scripts\python.exe scripts\backup.py --out backups\iptv.dump
 ```

@@ -57,6 +57,16 @@ def _key() -> bytes:
     return hashlib.sha256(_DEV_KEY_SEED).digest()
 
 
+def is_development_key(raw: str) -> bool:
+    """True when the configured key is missing or is the public development constant."""
+    if not raw:
+        return True
+    try:
+        return _decode_key(raw) == hashlib.sha256(_DEV_KEY_SEED).digest()
+    except ValueError:
+        return False
+
+
 def encrypt(plaintext: str) -> str:
     """Encrypt ``plaintext`` into a versioned, URL-safe envelope."""
     if plaintext == "":

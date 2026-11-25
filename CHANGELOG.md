@@ -18,6 +18,11 @@ All notable changes to this project are documented here. The format follows
   `GET/POST/DELETE /api/v1/blocklist`, and `scripts/catalog_import.py` for large files.
 - **Catalog screen** — counters (catalog / channels / matched / unmatched / blocks), JSON or file
   import, one-click matching, and blocklist management, covered by a browser test.
+- **Preflight** — `scripts/preflight.py` checks the encryption key (including the public development
+  key), public URL, timezone, Telegram token shape, rate limit, artifacts directory, database
+  connectivity and that migrations are at head. Exit code 1 on failure.
+- **Owner documentation** — `docs/ACCEPTANCE.md` (manual pass with a real provider and TV) and
+  `docs/DEPLOYMENT.md` (Coolify plan, rollback, risk register, GO checklist; not executed).
 
 ### Changed
 
