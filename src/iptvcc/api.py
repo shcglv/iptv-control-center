@@ -59,6 +59,7 @@ from .quality import compute
 from .ratelimit import public_rate_limit
 from .secrets import decrypt, mask_url
 from .security import generate_device_token, hash_token, token_prefix
+from .services.capabilities import effective_guide_cap
 from .services.catalog import (
     apply_blocklist,
     catalog_status,
@@ -668,7 +669,10 @@ async def _serve_epg(token: str, session: AsyncSession, *, gzipped: bool) -> Fil
             token,
             out_dir,
             cache_key=key,
-            max_bytes=get_settings().epg_max_bytes,
+            max_bytes=effective_guide_cap(
+                assignment.device.kind if assignment.device else None,
+                get_settings().epg_max_bytes,
+            ),
         )
         if rendered is None:
             raise HTTPException(status_code=404, detail="unknown or revoked token")
@@ -1673,7 +1677,11 @@ async def resolve(token: str, public_key: str, ext: str, session: SessionDep) ->
     if assignment is None:
         raise HTTPException(status_code=404, detail="unknown or revoked token")
     stream = await resolve_stream(
-        session, public_key, ext, profile_id=assignment.playlist_profile_id
+        session,
+        public_key,
+        ext,
+        profile_id=assignment.playlist_profile_id,
+        device_kind=assignment.device.kind if assignment.device else None,
     )
     if stream is None:
         raise HTTPException(

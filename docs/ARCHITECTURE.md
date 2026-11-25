@@ -285,8 +285,31 @@ provider's spelling.
 
 Matching is idempotent: already matched channels are counted as `already` and never re-pointed.
 
-## 6.9 Diagnostics
+## 6.9 Client compatibility
 
+A playlist that offers MPEG-TS to an Apple TV has dead channels: AVPlayer does not play raw
+transport streams. OwnTV (ExoPlayer) is the opposite — it plays TS, and a `.ts` URL that answers with
+an HLS manifest breaks it.
+
+The device `kind` therefore decides what may be advertised:
+
+| Kind | Containers | Guide cap |
+|---|---|---|
+| `android_tv` (OwnTV/ExoPlayer) | ts, m3u8 | 5 MB |
+| `apple_tv` (AVPlayer) | m3u8 | 8 MB |
+| `desktop` (VLC, mpv) | ts, m3u8, mpd | operator's |
+| `mobile` | m3u8 | 4 MB |
+| `other` / unknown | ts, m3u8 | 5 MB |
+
+The playlist filters each channel's ranked sources to the client's containers, so a TS-only channel
+simply does not appear for an Apple TV. The resolver refuses a container the client cannot play
+instead of guessing, and the guide cap is the smaller of the operator's `IPTV_EPG_MAX_BYTES` and the
+client family's tolerance.
+
+Capabilities are static, not per-device configuration: they describe a client family, and asking an
+operator to tune them per TV would be a worse product.
+
+## 6.10 Diagnostics
 Two things make a failure explainable instead of mysterious.
 
 **Request correlation.** Every response carries `X-Request-ID`; an incoming value is reused (bounded

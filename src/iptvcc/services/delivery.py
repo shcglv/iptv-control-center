@@ -22,6 +22,7 @@ from ..models import (
 )
 from ..secrets import decrypt
 from ..security import hash_token
+from .capabilities import for_device
 from .profiles import pinned_stream_for, visible_channels
 from .selector import load_link_views, load_qualities, rank_views, select_stream_id
 
@@ -52,6 +53,7 @@ async def get_active_assignment(session: AsyncSession, token: str) -> Assignment
         select(Assignment)
         .where(Assignment.token_hash == hash_token(token))
         .options(selectinload(Assignment.playlist_profile))
+        .options(selectinload(Assignment.device))
     )
     if assignment is None or assignment.revoked_at is not None:
         return None
@@ -64,14 +66,18 @@ async def resolve_stream(
     ext: str,
     *,
     profile_id: int | None = None,
+    device_kind: str | None = None,
 ) -> ResolvedStream | None:
     """Pick the best stream of a channel for the requested container.
 
     Never redirects across containers: a ``.ts`` URL that answers with an HLS manifest breaks
-    ExoPlayer and loops mpv (documented in OwnTV's source).
+    ExoPlayer and loops mpv (documented in OwnTV's source). When the client's capabilities are
+    known, a container it cannot play is refused outright instead of being guessed at.
     """
     wanted = _EXT_TO_CONTAINER.get(ext.lower())
     if wanted is None:
+        return None
+    if device_kind is not None and not for_device(device_kind).supports(wanted):
         return None
 
     channel = await session.scalar(select(Channel).where(Channel.public_key == public_key))
@@ -108,10 +114,16 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
         ).all()
     )
 
+    capabilities = for_device(assignment.device.kind if assignment.device else None)
+
     rendered: list[RenderedChannel] = []
     for item in lineup:
         channel = item.channel
-        ranked = rank_views(links_by_channel.get(channel.id, []), qualities, None)
+        ranked = [
+            candidate
+            for candidate in rank_views(links_by_channel.get(channel.id, []), qualities, None)
+            if capabilities.supports(candidate.container)
+        ]
         if not ranked:
             continue
         chosen = ranked[0]

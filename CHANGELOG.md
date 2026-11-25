@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-11-25
+
+### Added
+
+- **Client Compatibility Engine.** Each device family declares which containers it can play, and the
+  playlist only advertises those: `android_tv` gets ts + m3u8, `apple_tv` and `mobile` get HLS only,
+  `desktop` gets everything, unknown kinds fall back to the conservative pair. A TS-only channel no
+  longer appears in an Apple TV playlist as a channel that cannot play.
+- The resolver refuses a container the client cannot handle instead of guessing, and the guide cap
+  is now the smaller of `IPTV_EPG_MAX_BYTES` and the family's tolerance (5 MB Android TV, 8 MB Apple
+  TV, 4 MB mobile).
+- `tests/test_capabilities.py`: registry, fallback, cap arithmetic, playlist filtering per kind and
+  resolver refusal.
+
 ## [1.1.0] — 2026-11-25
 
 ### Added

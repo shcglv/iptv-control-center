@@ -23,7 +23,7 @@ Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 | Category visibility editor, impact panel, in-editor preview | ❌ not implemented | — |
 | Devices: hashed token, instant rotation/revocation | ✅ | `test_api.py` |
 | Deterministic per-device playlist, all three EPG attributes | ✅ | container test |
-| **Client Compatibility Engine** (`RenderPlan`) | ❌ not implemented | — |
+| **Client Compatibility Engine** (`RenderPlan`) | ✅ | per-family container sets and guide caps: a TS-only channel is absent from an Apple TV playlist and its `.ts` resolver request is refused; `test_capabilities.py` |
 | XMLTV ingest: streaming, timezone offsets, retention, replace | ✅ | 19-test EPG corpus; **real public guide**: 287 channels, 48 814 programmes from a 20.9 MiB file (`REAL-WORLD.md`) |
 | Channel↔EPG mapping, mapped ids emitted in the playlist | ✅ | `test_epg.py`, container test |
 | Per-device guide, cached per profile | ✅ | container test, `test_profiles.py` |
