@@ -352,9 +352,9 @@ def test_discovery_reviews_a_candidate(
 
         page.get_by_role("button", name="Источники").click()
         page.wait_for_selector("text=Новый источник", timeout=10_000)
-        assert (
-            page.locator("table").get_by_text("UK playlist").count() >= 1
-            or page.locator("table").get_by_text("Secret panel").count() >= 1
+        # The table is fetched after the page renders; wait for the accepted source by name.
+        page.locator("table").get_by_text(re.compile("UK playlist|Secret panel")).first.wait_for(
+            timeout=15_000
         )
 
         browser.close()
