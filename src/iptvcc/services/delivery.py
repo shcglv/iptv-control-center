@@ -23,7 +23,7 @@ from ..models import (
 from ..secrets import decrypt
 from ..security import hash_token
 from .profiles import pinned_stream_for, visible_channels
-from .selector import load_qualities, rank_links, select_stream_id
+from .selector import load_link_views, load_qualities, rank_views, select_stream_id
 
 _EXT_TO_CONTAINER = {
     "ts": CONTAINER_TS,
@@ -96,6 +96,7 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
 
     profile_id = assignment.playlist_profile_id
     lineup = await visible_channels(session, profile_id)
+    links_by_channel = await load_link_views(session, [item.channel.id for item in lineup])
     qualities = await load_qualities(session)
     xmltv_ids = dict(
         (
@@ -110,7 +111,7 @@ async def build_playlist(session: AsyncSession, token: str, base_url: str) -> st
     rendered: list[RenderedChannel] = []
     for item in lineup:
         channel = item.channel
-        ranked = rank_links(channel, qualities, None)
+        ranked = rank_views(links_by_channel.get(channel.id, []), qualities, None)
         if not ranked:
             continue
         chosen = ranked[0]

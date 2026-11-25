@@ -634,14 +634,19 @@ async def device_epg_gzip(token: str, session: SessionDep) -> FileResponse:
 
 
 async def _serve_epg(token: str, session: AsyncSession, *, gzipped: bool) -> FileResponse:
+    assignment = await get_active_assignment(session, token)
+    if assignment is None:
+        raise HTTPException(status_code=404, detail="unknown or revoked token")
+
     out_dir = Path(get_settings().artifacts_dir) / "epg"
-    key = guide_cache_key(token)
+    # The guide depends on the profile, not on the device: devices sharing a profile share the file.
+    key = guide_cache_key(f"profile:{assignment.playlist_profile_id}")
     xml_path = out_dir / f"{key}.xml"
     gz_path = out_dir / f"{key}.xml.gz"
 
     fresh = xml_path.exists() and (time.time() - xml_path.stat().st_mtime) < 300
     if not fresh:
-        rendered = await build_guide(session, token, out_dir)
+        rendered = await build_guide(session, token, out_dir, cache_key=key)
         if rendered is None:
             raise HTTPException(status_code=404, detail="unknown or revoked token")
         xml_path, gz_path = rendered

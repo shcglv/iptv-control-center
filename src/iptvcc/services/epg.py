@@ -21,7 +21,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from lxml import etree
-from sqlalchemy import delete, select
+from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -32,6 +32,7 @@ from .delivery import get_active_assignment
 from .profiles import visible_channels
 
 BATCH_SIZE = 2000
+_GUIDE_CHUNK = 200
 MAX_DOCUMENT_BYTES = 512 * 1024 * 1024
 _XMLTV_FORMAT = "%Y%m%d%H%M%S"
 _OUTPUT_FORMAT = "%Y%m%d%H%M%S +0000"
@@ -85,8 +86,17 @@ def parse_xmltv_time(value: str, default_tz: str) -> int:
     return int(naive.replace(tzinfo=zone).timestamp())
 
 
+_OUTPUT_FORMAT = "%Y%m%d%H%M%S +0000"
+
+
 def format_xmltv_time(epoch: int) -> str:
-    return datetime.fromtimestamp(epoch, UTC).strftime(_OUTPUT_FORMAT)
+    # Hand-built from gmtime: datetime.fromtimestamp + strftime costs ~20 us per call on Windows,
+    # and a guide formats two timestamps per programme.
+    tm = time.gmtime(epoch)
+    return (
+        f"{tm.tm_year:04d}{tm.tm_mon:02d}{tm.tm_mday:02d}"
+        f"{tm.tm_hour:02d}{tm.tm_min:02d}{tm.tm_sec:02d} +0000"
+    )
 
 
 def _guard_document(data: bytes) -> None:
@@ -108,12 +118,14 @@ def _release(element: etree._Element) -> None:
         del parent[0]
 
 
-def iter_xmltv(data: bytes, default_tz: str) -> Iterator[tuple[str, dict[str, Any]]]:
+def iter_xmltv(data: bytes | str, default_tz: str) -> Iterator[tuple[str, dict[str, Any]]]:
     """Yield ``("channel", {...})`` and ``("programme", {...})`` records in document order.
 
     Only the elements we consume are released. Clearing every element end would wipe
     ``<display-name>`` before its parent ``<channel>`` is read.
     """
+    if isinstance(data, str):
+        data = data.encode("utf-8")
     _guard_document(data)
     context = etree.iterparse(
         BytesIO(data), events=("end",), huge_tree=False, no_network=True, recover=False
@@ -161,7 +173,9 @@ def iter_xmltv(data: bytes, default_tz: str) -> Iterator[tuple[str, dict[str, An
             _release(element)
 
 
-async def ingest_xmltv(session: AsyncSession, source: EpgSource, data: bytes) -> EpgIngestStats:
+async def ingest_xmltv(
+    session: AsyncSession, source: EpgSource, data: bytes | str
+) -> EpgIngestStats:
     stats = EpgIngestStats()
     cutoff = int(time.time()) - source.retention_days * 86_400
 
@@ -178,11 +192,11 @@ async def ingest_xmltv(session: AsyncSession, source: EpgSource, data: bytes) ->
             )
         )
 
-    batch: list[Programme] = []
+    batch: list[dict[str, object]] = []
 
-    def drain() -> None:
+    async def drain() -> None:
         if batch:
-            session.add_all(batch)
+            await session.execute(insert(Programme), batch)
             batch.clear()
 
     for kind, item in iter_xmltv(data, source.default_timezone):
@@ -196,7 +210,8 @@ async def ingest_xmltv(session: AsyncSession, source: EpgSource, data: bytes) ->
                     icon_url=item["icon_url"],
                 )
                 session.add(channel)
-                await session.flush()
+                # No flush here: a guide lists thousands of channels before the first programme.
+                # The id is assigned when a programme needs it (one flush for all pending rows).
                 existing[item["id"]] = channel
                 stats.channels += 1
             else:
@@ -208,26 +223,28 @@ async def ingest_xmltv(session: AsyncSession, source: EpgSource, data: bytes) ->
         if channel is None:
             stats.skipped += 1
             continue
+        if channel.id is None:
+            # First programme of a channel created in this run: assign ids to every pending row.
+            await session.flush()
         if item["stop"] is not None and item["stop"] < cutoff:
             stats.pruned += 1
             continue
         batch.append(
-            Programme(
-                epg_channel_id=channel.id,
-                start_epoch=item["start"],
-                stop_epoch=item["stop"],
-                title=item["title"],
-                subtitle=item["subtitle"],
-                description=item["description"],
-                category=item["category"],
-            )
+            {
+                "epg_channel_id": channel.id,
+                "start_epoch": item["start"],
+                "stop_epoch": item["stop"],
+                "title": item["title"],
+                "subtitle": item["subtitle"],
+                "description": item["description"],
+                "category": item["category"],
+            }
         )
         stats.programmes += 1
         if len(batch) >= BATCH_SIZE:
-            drain()
-            await session.flush()
+            await drain()
 
-    drain()
+    await drain()
     await session.flush()
 
     source.last_fetch_at = datetime.now(UTC)
@@ -328,14 +345,20 @@ async def build_guide(
     *,
     days_back: int = 1,
     days_forward: int = 7,
+    cache_key: str | None = None,
 ) -> tuple[Path, Path] | None:
-    """Render the device guide to ``out_dir`` and return ``(xml_path, gzip_path)``."""
+    """Render the device guide to ``out_dir`` and return ``(xml_path, gzip_path)``.
+
+    ``cache_key`` defaults to a hash of the token, but callers that share the rendered file between
+    devices on the same playlist profile pass a profile-scoped key: the guide depends on the
+    profile, not on the device.
+    """
     entries = await epg_ids_for_assignment(session, token)
     if entries is None:
         return None
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    key = guide_cache_key(token)
+    key = cache_key or guide_cache_key(token)
     xml_path = out_dir / f"{key}.xml"
     gz_path = out_dir / f"{key}.xml.gz"
 
@@ -352,35 +375,55 @@ async def build_guide(
                 etree.SubElement(channel_el, "display-name").text = display_name or xmltv_id
                 xf.write(channel_el)
 
-            for _channel_id, epg_id, xmltv_id, _display_name in entries:
-                programmes = (
-                    await session.scalars(
-                        select(Programme)
+            # Programmes are fetched in chunks of channels: one query per few hundred channels
+            # instead of one per channel, and only the columns the writer needs.
+            for start in range(0, len(entries), _GUIDE_CHUNK):
+                chunk = entries[start : start + _GUIDE_CHUNK]
+                ids = [epg_id for _channel_id, epg_id, _xmltv_id, _display_name in chunk]
+                rows = (
+                    await session.execute(
+                        select(
+                            Programme.epg_channel_id,
+                            Programme.start_epoch,
+                            Programme.stop_epoch,
+                            Programme.title,
+                            Programme.subtitle,
+                            Programme.description,
+                            Programme.category,
+                        )
                         .where(
-                            Programme.epg_channel_id == epg_id,
+                            Programme.epg_channel_id.in_(ids),
                             Programme.start_epoch <= window_end,
                             (Programme.stop_epoch.is_(None))
                             | (Programme.stop_epoch >= window_start),
                         )
-                        .order_by(Programme.start_epoch)
+                        .order_by(Programme.epg_channel_id, Programme.start_epoch)
                     )
                 ).all()
-                for programme in programmes:
-                    attrs = {"start": format_xmltv_time(programme.start_epoch), "channel": xmltv_id}
-                    if programme.stop_epoch is not None:
-                        attrs["stop"] = format_xmltv_time(programme.stop_epoch)
-                    element = etree.Element("programme", attrs)
-                    etree.SubElement(element, "title").text = programme.title or ""
-                    if programme.subtitle:
-                        etree.SubElement(element, "sub-title").text = programme.subtitle
-                    if programme.description:
-                        etree.SubElement(element, "desc").text = programme.description
-                    if programme.category:
-                        etree.SubElement(element, "category").text = programme.category
-                    xf.write(element)
+                grouped: dict[int, list[Any]] = {}
+                for row in rows:
+                    grouped.setdefault(row.epg_channel_id, []).append(row)
+
+                for _channel_id, epg_id, xmltv_id, _display_name in chunk:
+                    for programme in grouped.get(epg_id, []):
+                        attrs = {
+                            "start": format_xmltv_time(programme.start_epoch),
+                            "channel": xmltv_id,
+                        }
+                        if programme.stop_epoch is not None:
+                            attrs["stop"] = format_xmltv_time(programme.stop_epoch)
+                        element = etree.Element("programme", attrs)
+                        etree.SubElement(element, "title").text = programme.title or ""
+                        if programme.subtitle:
+                            etree.SubElement(element, "sub-title").text = programme.subtitle
+                        if programme.description:
+                            etree.SubElement(element, "desc").text = programme.description
+                        if programme.category:
+                            etree.SubElement(element, "category").text = programme.category
+                        xf.write(element)
 
     with open(xml_path, "rb") as raw, gzip.open(gz_path, "wb", compresslevel=6) as compressed:
-        while chunk := raw.read(1024 * 1024):
-            compressed.write(chunk)
+        while block := raw.read(1024 * 1024):
+            compressed.write(block)
 
     return xml_path, gz_path

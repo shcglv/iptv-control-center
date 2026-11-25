@@ -114,11 +114,19 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [ ] Rich messages / widgets / topics (Bot API 10.x extras)
 - [ ] Daily scheduled report at a fixed local time
 
-## P9 — Hardening — `[ ]`
+## P9 — Scale — `[x]`
 
-SSRF suite, rate limits, log audit, restore drill, load test, accessibility and visual regression,
-full Coolify checklist, runbook.
+- [x] Benchmark harness (`scripts/bench_scale.py`) for import, render, EPG ingest, mapping and guide build
+- [x] 10 000 channels / 30 000 streams / 240 000 programmes measured — see `docs/PERFORMANCE.md`
+- [x] Import ≈5× faster, render ≈2.5×, EPG ingest ≈4×, guide ≈2×
+- [ ] Re-measure on PostgreSQL and on the target server
+- [ ] Profile-based playlist render cache if a cold 1.5 s playlist becomes a problem
 
-## P10 — Extensions — `[ ]`
+## P10 — Hardening — `[ ]`
+
+SSRF suite, rate limits, log audit, restore drill, accessibility and visual regression, full Coolify
+checklist, runbook.
+
+## P11 — Extensions — `[ ]`
 
 Xtream server endpoint, catch-up, worker split, plugin host, relay mode (opt-in), multi-user.

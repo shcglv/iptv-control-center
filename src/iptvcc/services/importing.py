@@ -11,7 +11,7 @@ import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..m3u import Entry, iter_entries
@@ -26,6 +26,8 @@ from ..models import (
 )
 from ..secrets import encrypt
 from ..security import new_public_key
+
+_BULK = 5000
 
 
 def _digest(*parts: str) -> str:
@@ -55,7 +57,11 @@ class ImportStats:
 
 
 async def import_playlist(session: AsyncSession, source: Source, text: str) -> ImportStats:
-    """Import a playlist body into ``source`` and return counters."""
+    """Import a playlist body into ``source`` and return counters.
+
+    New streams are inserted in bulk: a 30 000-stream playlist is a routine size, and inserting it
+    through the ORM unit of work made the cold import an order of magnitude slower than the parse.
+    """
     stats = ImportStats()
     now = datetime.now(UTC)
     entries = list(iter_entries(text.splitlines()))
@@ -66,8 +72,10 @@ async def import_playlist(session: AsyncSession, source: Source, text: str) -> I
     ).all()
     existing = {row.stream_hash: row for row in existing_rows}
 
-    touched: list[tuple[Stream, Entry]] = []
-    seen: set[int] = set()
+    touched: list[tuple[int, Entry]] = []
+    seen_hashes: set[str] = set()
+    pending: list[tuple[Entry, dict[str, object], str]] = []
+    unchanged_hashes: list[str] = []
 
     for entry in entries:
         stream_hash = _digest(str(source.id), entry.url)
@@ -75,32 +83,41 @@ async def import_playlist(session: AsyncSession, source: Source, text: str) -> I
         row = existing.get(stream_hash)
 
         if row is None:
-            row = Stream(
-                source_id=source.id,
-                stream_key=stream_key,
-                stream_hash=stream_hash,
-                name=entry.name,
-                tvg_id=entry.tvg_id,
-                tvg_name=entry.tvg_name,
-                logo_url=entry.logo,
-                group_title=entry.group_title,
-                url_enc=encrypt(entry.url),
-                container=entry.container,
-                first_seen=now,
-                last_seen=now,
+            if stream_hash in seen_hashes:
+                continue  # the same URL twice in one playlist
+            seen_hashes.add(stream_hash)
+            pending.append(
+                (
+                    entry,
+                    {
+                        "source_id": source.id,
+                        "stream_key": stream_key,
+                        "stream_hash": stream_hash,
+                        "name": entry.name,
+                        "tvg_id": entry.tvg_id,
+                        "tvg_name": entry.tvg_name,
+                        "logo_url": entry.logo,
+                        "group_title": entry.group_title,
+                        "url_enc": encrypt(entry.url),
+                        "container": entry.container,
+                        "is_stale": False,
+                        "first_seen": now,
+                        "last_seen": now,
+                    },
+                    stream_hash,
+                )
             )
-            session.add(row)
-            existing[stream_hash] = row
-            stats.created += 1
-        else:
-            changed = (
-                row.name != entry.name
-                or row.tvg_id != entry.tvg_id
-                or row.logo_url != entry.logo
-                or row.group_title != entry.group_title
-                or row.container != entry.container
-                or row.is_stale
-            )
+            continue
+
+        changed = (
+            row.name != entry.name
+            or row.tvg_id != entry.tvg_id
+            or row.logo_url != entry.logo
+            or row.group_title != entry.group_title
+            or row.container != entry.container
+            or row.is_stale
+        )
+        if changed:
             row.name = entry.name
             row.tvg_id = entry.tvg_id
             row.tvg_name = entry.tvg_name
@@ -109,24 +126,66 @@ async def import_playlist(session: AsyncSession, source: Source, text: str) -> I
             row.container = entry.container
             row.is_stale = False
             row.last_seen = now
-            if changed:
-                stats.updated += 1
-            else:
-                stats.unchanged += 1
+            stats.updated += 1
+        else:
+            # The heartbeat is applied as one bulk UPDATE below; marking thousands of rows dirty
+            # here turned every no-op re-import into thousands of single-row updates.
+            unchanged_hashes.append(stream_hash)
+            stats.unchanged += 1
 
-        seen.add(id(row))
-        touched.append((row, entry))
+        seen_hashes.add(stream_hash)
+        touched.append((row.id, entry))
+
+    if unchanged_hashes:
+        for start in range(0, len(unchanged_hashes), _BULK):
+            await session.execute(
+                update(Stream)
+                .where(Stream.stream_hash.in_(unchanged_hashes[start : start + _BULK]))
+                .values(last_seen=now)
+                # Without this, SQLAlchemy evaluates the criteria against every Stream object in
+                # the identity map (tens of thousands) and the update becomes quadratic.
+                .execution_options(synchronize_session=False)
+            )
+
+    if pending:
+        for start in range(0, len(pending), _BULK):
+            batch = [row for _entry, row, _hash in pending[start : start + _BULK]]
+            await session.execute(insert(Stream), batch)
+        hashes = [stream_hash for _entry, _row, stream_hash in pending]
+        ids: dict[str, int] = {}
+        for start in range(0, len(hashes), _BULK):
+            chunk = hashes[start : start + _BULK]
+            rows = (
+                await session.execute(
+                    select(Stream.stream_hash, Stream.id).where(Stream.stream_hash.in_(chunk))
+                )
+            ).all()
+            ids.update(dict(rows))
+        for entry, _row, stream_hash in pending:
+            stream_id = ids.get(stream_hash)
+            if stream_id is None:
+                continue
+            touched.append((stream_id, entry))
+            stats.created += 1
+        await session.flush()
 
     if touched:
         for row in existing.values():
-            if id(row) not in seen and not row.is_stale:
+            if row.stream_hash not in seen_hashes and not row.is_stale:
                 row.is_stale = True
                 stats.stale += 1
 
     await session.flush()
     await _attach_channels(session, touched, stats)
 
-    source.stream_count = sum(1 for row in existing.values() if not row.is_stale)
+    source.stream_count = (
+        await session.scalar(
+            select(func.count())
+            .select_from(Stream)
+            .where(Stream.source_id == source.id, Stream.is_stale.is_(False))
+        )
+        or 0
+    )
     source.last_import_at = now
     source.last_status = "success"
     source.last_error = None
@@ -135,7 +194,7 @@ async def import_playlist(session: AsyncSession, source: Source, text: str) -> I
 
 
 async def _attach_channels(
-    session: AsyncSession, touched: list[tuple[Stream, Entry]], stats: ImportStats
+    session: AsyncSession, touched: list[tuple[int, Entry]], stats: ImportStats
 ) -> None:
     channels = (await session.scalars(select(Channel))).all()
     by_tvg = {channel.tvg_id: channel for channel in channels if channel.tvg_id}
@@ -151,7 +210,27 @@ async def _attach_channels(
         ).all()
     )
 
-    for stream, entry in touched:
+    # One query per chunk for existing links, instead of one per stream.
+    stream_ids = [stream_id for stream_id, _entry in touched]
+    existing_links: set[tuple[str, int]] = set()
+    for start in range(0, len(stream_ids), _BULK):
+        existing_links.update(
+            {
+                (channel_id, stream_id)
+                for channel_id, stream_id in (
+                    await session.execute(
+                        select(ChannelStream.channel_id, ChannelStream.stream_id).where(
+                            ChannelStream.stream_id.in_(stream_ids[start : start + _BULK])
+                        )
+                    )
+                ).all()
+            }
+        )
+
+    # Pass 1: resolve or create channels and register them in the lookup maps immediately, so
+    # later entries in the same import find them without a flush.
+    resolved: list[tuple[int, Channel]] = []
+    for stream_id, entry in touched:
         tvg_id = entry.tvg_id
         match_key = normalize(entry.name) or None
 
@@ -175,31 +254,37 @@ async def _attach_channels(
                 match_key=match_key,
             )
             session.add(channel)
-            await session.flush()
             if tvg_id:
                 by_tvg[tvg_id] = channel
             if match_key:
                 by_key[match_key] = channel
             stats.channels_created += 1
 
+        resolved.append((stream_id, channel))
+
+    # A single flush assigns ids to every new channel.
+    await session.flush()
+
+    # Pass 2: build the missing links, then insert them in bulk.
+    link_rows: list[dict[str, object]] = []
+    for stream_id, channel in resolved:
+        if (channel.id, stream_id) in existing_links:
+            continue
         next_priority = link_counts.get(channel.id, 0)
-        already_linked = await session.scalar(
-            select(ChannelStream.id).where(
-                ChannelStream.channel_id == channel.id,
-                ChannelStream.stream_id == stream.id,
-            )
+        link_rows.append(
+            {
+                "channel_id": channel.id,
+                "stream_id": stream_id,
+                "priority": next_priority,
+                "role": ROLE_PRIMARY,
+            }
         )
-        if already_linked is None:
-            session.add(
-                ChannelStream(
-                    channel_id=channel.id,
-                    stream_id=stream.id,
-                    priority=next_priority,
-                    role=ROLE_PRIMARY,
-                )
-            )
-            link_counts[channel.id] = next_priority + 1
-            stats.channels_linked += 1
+        existing_links.add((channel.id, stream_id))
+        link_counts[channel.id] = next_priority + 1
+        stats.channels_linked += 1
+
+    for start in range(0, len(link_rows), _BULK):
+        await session.execute(insert(ChannelStream), link_rows[start : start + _BULK])
 
 
 async def _category_id(

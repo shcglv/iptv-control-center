@@ -15,11 +15,25 @@ from iptvcc.models import Channel, EpgSource, Programme
 from iptvcc.services.epg import (
     XmltvError,
     ingest_xmltv,
+    iter_xmltv,
     map_channels,
     parse_xmltv_time,
 )
 
 from .conftest import ADMIN_HEADERS, SAMPLE_M3U
+
+
+def test_iter_xmltv_accepts_str_and_bytes() -> None:
+    """Both call styles must work: the API passes a decoded string, imports pass bytes."""
+    document = (
+        '<?xml version="1.0"?><tv><channel id="a.test"><display-name>A</display-name></channel>'
+        '<programme start="20261124160000 +0000" stop="20261124170000 +0000" channel="a.test">'
+        "<title>T</title></programme></tv>"
+    )
+    from_str = list(iter_xmltv(document, "UTC"))
+    from_bytes = list(iter_xmltv(document.encode("utf-8"), "UTC"))
+    assert [kind for kind, _ in from_str] == ["channel", "programme"]
+    assert from_str == from_bytes
 
 
 def _fmt(moment: datetime) -> str:

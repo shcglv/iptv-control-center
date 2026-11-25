@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-11-25
+
+Performance work measured at the top of the target range (10 000 channels, 30 000 streams,
+240 000 programmes). Details and methodology: [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
+
+### Changed
+
+- Import: one flush for all new channels, chunked link preloading, bulk inserts for streams and
+  links, batched heartbeat updates — 43.4 s → 7.7 s cold, 6.9 s → 3.9 s on re-import.
+- Playlist render: links are read as a flat projection instead of a full ORM graph — 3.7 s → 1.5 s
+  for 10 000 channels.
+- EPG ingest: bulk `INSERT` for programmes, one flush for all pending channels — ≈4× faster.
+- Guide build: programmes fetched 200 channels at a time with column projections; timestamps are
+  formatted from `time.gmtime` instead of `strftime` — 21 s for 39 MiB of XML at 10 000 channels.
+- Guides are cached per **profile** rather than per device, so devices sharing a profile share one
+  render.
+
+### Fixed
+
+- `ingest_xmltv` crashed with `TypeError` when handed a `str` instead of `bytes`; both are accepted.
+- A repeated URL inside one playlist could create a duplicate stream row.
+
+### Added
+
+- `scripts/bench_scale.py` — reproducible benchmark for import, render, EPG ingest, mapping and
+  guide build.
+
 ## [0.2.0] — 2026-11-25
 
 Second working slice: the control plane is operable from a browser and a Telegram chat.

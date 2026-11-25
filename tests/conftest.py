@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import os
+import shutil
+from pathlib import Path
 
 # Configure the app before it is imported anywhere.
 os.environ["IPTV_APP_ENV"] = "test"
@@ -15,10 +17,11 @@ os.environ["IPTV_ARTIFACTS_DIR"] = "./data/test-artifacts"
 # Tests fetch their own local HTTP servers for adapters and probes.
 os.environ["IPTV_ALLOW_PRIVATE_NETWORK_TARGETS"] = "1"
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
 import httpx
 import pyotp
+import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -47,6 +50,14 @@ http://provider.test/live/eurosport.m3u8
 #EXTINF:-1,No Attributes Channel
 http://provider.test/live/plain.ts
 """
+
+
+@pytest.fixture(autouse=True)
+def clean_artifacts() -> Iterator[None]:
+    """Rendered guides are cached on disk and keyed by profile id; ids restart per test."""
+    path = Path(os.environ["IPTV_ARTIFACTS_DIR"])
+    shutil.rmtree(path, ignore_errors=True)
+    path.mkdir(parents=True, exist_ok=True)
 
 
 @pytest_asyncio.fixture

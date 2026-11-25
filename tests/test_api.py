@@ -190,6 +190,33 @@ async def test_resolver_rejects_unknown_token(client: httpx.AsyncClient) -> None
 
 
 @pytest.mark.asyncio
+async def test_import_deduplicates_a_repeated_url(client: httpx.AsyncClient) -> None:
+    """The same URL twice in one playlist must produce one stream, not two."""
+    source = (
+        await client.post(
+            "/api/v1/sources",
+            json={"name": "Dup", "url": "http://p.test/d.m3u"},
+            headers=ADMIN_HEADERS,
+        )
+    ).json()
+    playlist = (
+        "#EXTM3U\n"
+        '#EXTINF:-1 tvg-id="one.test",One\nhttp://provider.test/same.ts\n'
+        '#EXTINF:-1 tvg-id="one.test",One\nhttp://provider.test/same.ts\n'
+    )
+    response = await client.post(
+        f"/api/v1/sources/{source['id']}/import",
+        json={"m3u": playlist},
+        headers=ADMIN_HEADERS,
+    )
+    stats = response.json()["stats"]
+    assert stats["parsed"] == 2
+    assert stats["created"] == 1
+    assert stats["channels_created"] == 1
+    assert stats["channels_linked"] == 1
+
+
+@pytest.mark.asyncio
 async def test_channel_sources_endpoint(client: httpx.AsyncClient) -> None:
     source = (
         await client.post(

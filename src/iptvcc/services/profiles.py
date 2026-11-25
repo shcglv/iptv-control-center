@@ -46,16 +46,23 @@ async def load_category_overrides(
     return {row.category_id: row for row in rows}
 
 
-async def visible_channels(session: AsyncSession, profile_id: int) -> list[VisibleChannel]:
-    """Resolve the profile's effective lineup, ordered for output."""
-    channels = (
-        await session.scalars(
-            select(Channel)
-            .where(Channel.is_hidden.is_(False))
-            .options(selectinload(Channel.links).selectinload(ChannelStream.stream))
-            .options(selectinload(Channel.category))
+async def visible_channels(
+    session: AsyncSession, profile_id: int, *, with_links: bool = False
+) -> list[VisibleChannel]:
+    """Resolve the profile's effective lineup, ordered for output.
+
+    ``with_links`` is off by default: the playlist renderer loads links as a flat projection
+    (:func:`load_link_views`), and the guide never needs them. Eager-loading the ORM graph for
+    thousands of channels was the dominant cost of rendering a large playlist.
+    """
+    statement = (
+        select(Channel).where(Channel.is_hidden.is_(False)).options(selectinload(Channel.category))
+    )
+    if with_links:
+        statement = statement.options(
+            selectinload(Channel.links).selectinload(ChannelStream.stream)
         )
-    ).all()
+    channels = (await session.scalars(statement)).all()
     channel_overrides = await load_channel_overrides(session, profile_id)
     category_overrides = await load_category_overrides(session, profile_id)
 
