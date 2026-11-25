@@ -103,6 +103,7 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] Discovery UI: run form, filter chips, masked candidate table, accept/reject
 - [x] Channel identity catalog (iptv-org shape), exact name/alias matching with country tie-break
 - [x] Take-down blocks: catalog id, tvg id, name (hide channel) and domain (disable source)
+- [x] Catalog screen: counters, JSON/file import, matching, blocklist management
 - [ ] Automatic catalog refresh on a schedule
 - [ ] iptv-org streams/EPG seeding (currently channels only)
 - [ ] Authenticated forum sessions (cookie import)

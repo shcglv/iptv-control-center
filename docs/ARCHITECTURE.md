@@ -196,8 +196,9 @@ no node runtime in production.
 
 Screens: Overview (stats, attention, worst streams), Channels (search + pagination), Quality
 (probe scores and a manual check), Discovery (run an adapter, review candidates, accept or reject),
-Playlists (profiles, per-channel visibility, ordering, source pins), Sources (create + import
-playlist), Devices (create, reveal token once, rotate). Login is password + TOTP.
+Playlists (profiles, per-channel visibility, ordering, source pins), Catalog (import identities,
+match channels, manage take-down blocks), Sources (create + import playlist), Devices (create, reveal
+token once, rotate). Login is password + TOTP.
 
 The UI is verified in a real browser: `tests/test_browser.py` starts the server as a subprocess,
 creates an admin with a known TOTP secret, logs in through Chromium, walks every section, edits a

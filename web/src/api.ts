@@ -288,6 +288,62 @@ export const rejectCandidate = (id: number): Promise<void> =>
 export const discoveryStatus = (): Promise<DiscoveryStatus> =>
   request<DiscoveryStatus>("/api/v1/discovery/status");
 
+export interface CatalogStatus {
+  catalog_channels: number;
+  channels: number;
+  matched_channels: number;
+  unmatched_channels: number;
+  blocks: number;
+}
+
+export interface CatalogImportResult {
+  received: number;
+  created: number;
+  updated: number;
+  skipped: number;
+}
+
+export interface CatalogMatchResult {
+  matched: number;
+  unmatched: number;
+  already: number;
+}
+
+export type BlockKind = "catalog_id" | "tvg_id" | "name" | "domain";
+
+export interface BlockRow {
+  id: number;
+  kind: BlockKind;
+  value: string;
+  reason: string | null;
+  created_at: string;
+}
+
+export const catalogStatus = (): Promise<CatalogStatus> =>
+  request<CatalogStatus>("/api/v1/catalog/status");
+
+export const importCatalog = (
+  channels: Record<string, unknown>[],
+): Promise<CatalogImportResult> =>
+  request<CatalogImportResult>("/api/v1/catalog/import", {
+    method: "POST",
+    body: JSON.stringify({ channels }),
+  });
+
+export const matchCatalog = (): Promise<CatalogMatchResult> =>
+  request<CatalogMatchResult>("/api/v1/catalog/match", { method: "POST" });
+
+export const listBlocks = (): Promise<BlockRow[]> => request<BlockRow[]>("/api/v1/blocklist");
+
+export const addBlock = (kind: BlockKind, value: string, reason?: string): Promise<BlockRow> =>
+  request<BlockRow>("/api/v1/blocklist", {
+    method: "POST",
+    body: JSON.stringify({ kind, value, reason: reason || null }),
+  });
+
+export const deleteBlock = (id: number): Promise<void> =>
+  request<void>(`/api/v1/blocklist/${id}`, { method: "DELETE" });
+
 export const schedulerStatus = (): Promise<SchedulerStatus> =>
   request<SchedulerStatus>("/api/v1/scheduler/status");
 

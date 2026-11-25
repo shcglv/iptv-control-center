@@ -274,6 +274,48 @@ def feed_server() -> Iterator[str]:
 
 
 @pytest.mark.browser
+def test_catalog_import_and_block(live_server: tuple[str, str], tmp_path: Path) -> None:
+    """Import a catalog, then add and remove a take-down block through the panel."""
+    base, secret = live_server
+
+    with playwright_api.sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(base, wait_until="domcontentloaded")
+        page.wait_for_selector("#email", timeout=15_000)
+        page.fill("#email", "admin@local")
+        page.fill("#password", PASSWORD)
+        page.fill("#totp", pyotp.TOTP(secret).now())
+        page.click("button[type=submit]")
+        page.wait_for_selector("text=Требует внимания", timeout=20_000)
+
+        page.get_by_role("button", name="Каталог").click()
+        page.wait_for_selector("text=Импорт каталога", timeout=10_000)
+
+        page.fill(
+            "#catalog-json",
+            '[{"id": "BBCOne.uk", "name": "BBC One", "country": "GB"},'
+            ' {"id": "CNN.us", "name": "CNN", "country": "US"}]',
+        )
+        page.get_by_role("button", name="Импортировать").click()
+        page.wait_for_selector("text=Принято 2", timeout=15_000)
+
+        page.get_by_role("button", name="Сопоставить каналы").click()
+        page.wait_for_selector("text=Сопоставлено", timeout=15_000)
+
+        page.fill("#block-value", "BBCOne.uk")
+        page.get_by_role("button", name="Заблокировать").click()
+        page.wait_for_selector("text=Блок добавлен", timeout=10_000)
+        page.get_by_role("row", name="BBCOne.uk").wait_for(timeout=10_000)
+        page.screenshot(path=str(tmp_path / "catalog.png"), full_page=True)
+
+        page.get_by_role("button", name="Удалить блок BBCOne.uk").click()
+        page.wait_for_selector("text=Блоков нет", timeout=10_000)
+
+        browser.close()
+
+
+@pytest.mark.browser
 def test_discovery_reviews_a_candidate(
     live_server: tuple[str, str], feed_server: str, tmp_path: Path
 ) -> None:

@@ -16,6 +16,8 @@ All notable changes to this project are documented here. The format follows
   resolver); `domain` disables a source. Blocks are idempotent and re-applicable.
 - `POST /api/v1/catalog/import`, `POST /api/v1/catalog/match`, `GET /api/v1/catalog/status`,
   `GET/POST/DELETE /api/v1/blocklist`, and `scripts/catalog_import.py` for large files.
+- **Catalog screen** — counters (catalog / channels / matched / unmatched / blocks), JSON or file
+  import, one-click matching, and blocklist management, covered by a browser test.
 
 ### Changed
 

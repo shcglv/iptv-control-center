@@ -5,11 +5,12 @@ import Overview from "./pages/Overview";
 import Channels from "./pages/Channels";
 import Quality from "./pages/Quality";
 import Discovery from "./pages/Discovery";
+import Catalog from "./pages/Catalog";
 import Profiles from "./pages/Profiles";
 import Sources from "./pages/Sources";
 import Devices from "./pages/Devices";
 
-type Tab = "overview" | "channels" | "quality" | "discovery" | "profiles" | "sources" | "devices";
+type Tab = "overview" | "channels" | "quality" | "discovery" | "profiles" | "catalog" | "sources" | "devices";
 
 const NAV: { group: string; items: { id: Tab; label: string; icon: string }[] }[] = [
   {
@@ -25,6 +26,7 @@ const NAV: { group: string; items: { id: Tab; label: string; icon: string }[] }[
     group: "Manage",
     items: [
       { id: "profiles", label: "Плейлисты", icon: "◍" },
+      { id: "catalog", label: "Каталог", icon: "▦" },
       { id: "sources", label: "Источники", icon: "◈" },
       { id: "devices", label: "Устройства", icon: "▣" },
     ],
@@ -104,6 +106,7 @@ function Shell({ onSignedOut }: { onSignedOut: () => void }) {
           {tab === "channels" && <Channels />}
           {tab === "quality" && <Quality />}
           {tab === "discovery" && <Discovery />}
+          {tab === "catalog" && <Catalog />}
           {tab === "profiles" && <Profiles />}
           {tab === "sources" && <Sources />}
           {tab === "devices" && <Devices />}
