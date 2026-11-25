@@ -17,7 +17,7 @@ CONTAINER_HLS: Final = "m3u8"
 CONTAINER_DASH: Final = "mpd"
 CONTAINER_OTHER: Final = "other"
 
-_ATTR_RE = re.compile(r'([A-Za-z0-9_.\-]+)\s*=\s*(?:"([^"]*)"|([^\s",]+))')
+_ATTR_RE = re.compile(r"""([A-Za-z0-9_.\-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"',]+))""")
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 _WS_RE = re.compile(r"\s+")
 _EXT_RE = re.compile(r"\.([A-Za-z0-9]{1,6})(?:$|[?#])")
@@ -25,6 +25,11 @@ _EXT_RE = re.compile(r"\.([A-Za-z0-9]{1,6})(?:$|[?#])")
 _TS_SUFFIXES = {"ts", "m2ts", "mts"}
 _HLS_SUFFIXES = {"m3u8", "m3u"}
 _DASH_SUFFIXES = {"mpd"}
+_HTTP_SCHEMES = ("http://", "https://")
+
+
+class PlaylistError(ValueError):
+    """Raised when a document cannot be treated as a channel list at all."""
 
 
 @dataclass
@@ -71,11 +76,11 @@ def _attr(attrs: dict[str, str], name: str) -> str:
 
 
 def parse_attributes(payload: str) -> dict[str, str]:
-    """Parse ``key="value"`` / ``key=value`` pairs from an ``#EXTINF`` payload."""
+    """Parse ``key="value"`` / ``key='value'`` / ``key=value`` pairs from an ``#EXTINF`` payload."""
     attrs: dict[str, str] = {}
     for match in _ATTR_RE.finditer(payload):
         key = match.group(1)
-        value = match.group(2) if match.group(2) is not None else (match.group(3) or "")
+        value = next((group for group in match.groups()[1:] if group is not None), "")
         attrs[key] = value
     return attrs
 
@@ -169,6 +174,29 @@ def iter_entries(lines: Iterable[str]) -> Iterator[Entry]:
         pending_name = ""
         group = None
         vlc_opts = []
+
+
+def validate_playlist(lines: Iterable[str]) -> None:
+    """Reject documents that are not a channel list, with a reason an operator can act on.
+
+    An HLS *media* playlist (``#EXT-X-TARGETDURATION``, segments) is the classic wrong paste: it
+    would otherwise import every segment as a channel.
+    """
+    has_entries = False
+    for raw in lines:
+        line = raw.strip().lstrip("\ufeff")
+        if not line:
+            continue
+        upper = line.upper()
+        if upper.startswith("#EXT-X-"):
+            raise PlaylistError(
+                "this is an HLS media playlist (segments), not a channel list; "
+                "use the provider's M3U export instead"
+            )
+        if not line.startswith("#"):
+            has_entries = True
+    if not has_entries:
+        raise PlaylistError("playlist contains no channel URLs")
 
 
 def _name_from_url(url: str) -> str:

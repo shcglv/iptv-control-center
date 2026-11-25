@@ -56,6 +56,7 @@ export interface ImportStats {
   updated: number;
   unchanged: number;
   stale: number;
+  skipped: number;
   channels_created: number;
   channels_linked: number;
 }

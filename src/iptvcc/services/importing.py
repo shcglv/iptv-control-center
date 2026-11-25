@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..m3u import Entry, iter_entries
+from ..m3u import Entry, iter_entries, validate_playlist
 from ..matching import normalize
 from ..models import (
     ROLE_PRIMARY,
@@ -41,6 +41,7 @@ class ImportStats:
     updated: int = 0
     unchanged: int = 0
     stale: int = 0
+    skipped: int = 0
     channels_created: int = 0
     channels_linked: int = 0
 
@@ -51,6 +52,7 @@ class ImportStats:
             "updated": self.updated,
             "unchanged": self.unchanged,
             "stale": self.stale,
+            "skipped": self.skipped,
             "channels_created": self.channels_created,
             "channels_linked": self.channels_linked,
         }
@@ -64,7 +66,9 @@ async def import_playlist(session: AsyncSession, source: Source, text: str) -> I
     """
     stats = ImportStats()
     now = datetime.now(UTC)
-    entries = list(iter_entries(text.splitlines()))
+    lines = text.splitlines()
+    validate_playlist(lines)
+    entries = list(iter_entries(lines))
     stats.parsed = len(entries)
 
     existing_rows = (
@@ -76,15 +80,22 @@ async def import_playlist(session: AsyncSession, source: Source, text: str) -> I
     seen_hashes: set[str] = set()
     pending: list[tuple[Entry, dict[str, object], str]] = []
     unchanged_hashes: list[str] = []
+    # A URL may appear twice under different names or ids. The stream is one row, but both
+    # entries must still resolve to a channel, so they are replayed once ids are known.
+    duplicates: list[tuple[Entry, str]] = []
 
     for entry in entries:
+        if not entry.url.lower().startswith(("http://", "https://")):
+            stats.skipped += 1
+            continue
         stream_hash = _digest(str(source.id), entry.url)
         stream_key = _digest(entry.url)[:32]
         row = existing.get(stream_hash)
 
         if row is None:
             if stream_hash in seen_hashes:
-                continue  # the same URL twice in one playlist
+                duplicates.append((entry, stream_hash))
+                continue
             seen_hashes.add(stream_hash)
             pending.append(
                 (
@@ -167,6 +178,10 @@ async def import_playlist(session: AsyncSession, source: Source, text: str) -> I
                 continue
             touched.append((stream_id, entry))
             stats.created += 1
+        for entry, stream_hash in duplicates:
+            stream_id = ids.get(stream_hash)
+            if stream_id is not None:
+                touched.append((stream_id, entry))
         await session.flush()
 
     if touched:

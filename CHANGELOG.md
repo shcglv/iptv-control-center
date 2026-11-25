@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-11-25
+
+Provider-corpus hardening: 17 tests built from realistic and hostile playlists.
+
+### Added
+
+- `tests/test_playlists.py` — single-quoted and unquoted attributes, commas inside quoted
+  attributes, `#EXTGRP` before and after `#EXTINF`, `#EXTVLCOPT`, CRLF/BOM, URLs without `#EXTINF`,
+  junk lines, Cyrillic names, duplicate `tvg-id`, one URL under two ids, windows-1251 without a
+  charset header.
+- Non-http URLs (`udp://`, `rtmp://`) are skipped and counted as `skipped` instead of being stored
+  as unplayable streams. The import result in the UI shows the counter.
+
+### Fixed
+
+- Single-quoted `#EXTINF` attributes were parsed with the quotes included, so `tvg-id='x'` produced
+  an id of `'x'`.
+- The same URL appearing twice under two channel ids silently dropped the second channel; the stream
+  stays one row and both channels now link to it.
+- A pasted HLS **media** playlist (segments) imported every segment as a channel. It is now rejected
+  with "this is an HLS media playlist … not a channel list".
+- A playlist containing no URLs is rejected instead of reporting a successful empty import.
+- Playlists in windows-1251 without a charset header were decoded as UTF-8 with replacement
+  characters; decoding now falls back through cp1251/cp1252.
+
 ## [0.3.0] — 2026-11-25
 
 ### Added

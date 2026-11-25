@@ -100,6 +100,32 @@ async def resolve_and_check(url: str) -> None:
             raise UnsafeUrlError(f"host resolves to a non-global address: {address}")
 
 
+def _decode_body(body: bytes, declared: str | None) -> str:
+    """Decode a playlist or XMLTV document.
+
+    Russian providers still ship windows-1251 without a charset header. UTF-8 is tried strictly
+    first, then the common single-byte encodings, then a lossy decode so an import never fails
+    purely on encoding.
+    """
+    if declared:
+        lowered = declared.lower()
+        if lowered not in {"utf-8", "utf8"}:
+            try:
+                return body.decode(declared)
+            except (LookupError, UnicodeDecodeError):
+                pass
+    try:
+        return body.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    for candidate in ("cp1251", "cp1252"):
+        try:
+            return body.decode(candidate)
+        except UnicodeDecodeError:
+            continue
+    return body.decode("latin-1", errors="replace")
+
+
 async def fetch_text(
     url: str, *, max_bytes: int = MAX_IMPORT_BYTES, timeout: float = DEFAULT_TIMEOUT
 ) -> str:
@@ -128,5 +154,5 @@ async def fetch_text(
             body = response.content
             if len(body) > max_bytes:
                 raise UnsafeUrlError("document is too large")
-            return body.decode(response.encoding or "utf-8", errors="replace")
+            return _decode_body(body, response.encoding)
     raise UnsafeUrlError("too many redirects")

@@ -84,6 +84,13 @@ Permanent identity: `channel.id` (UUID) and `channel.public_key` (12 chars, used
 `channel-id` for Jellyfin). Stream identity is `sha256(source_id, url)`, so re-imports are
 idempotent and a changed URL becomes a new stream.
 
+The parser accepts what providers actually ship: quoted or bare attributes, single quotes, commas
+inside quoted values, `#EXTGRP` before or after `#EXTINF`, `#EXTVLCOPT`, CRLF and a BOM. It refuses
+two things with an actionable message — an HLS *media* playlist (segments are not channels) and a
+document with no URLs — and skips non-http entries (`udp://`, `rtmp://`) with a counter, because the
+resolver can only redirect to http(s). Documents without a charset header are decoded as UTF-8,
+then cp1251/cp1252, so a windows-1251 provider does not turn into replacement characters.
+
 ## 6. Delivery semantics
 
 ### Playlist

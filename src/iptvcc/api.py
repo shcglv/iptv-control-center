@@ -32,6 +32,7 @@ from .auth import (
 )
 from .config import get_settings
 from .db import create_schema, dispose_engine, get_session, get_session_factory
+from .m3u import PlaylistError
 from .models import (
     AdminUser,
     Assignment,
@@ -342,7 +343,12 @@ async def import_source(
         source.last_error = "not an M3U playlist"
         raise HTTPException(status_code=422, detail="body is not an M3U playlist")
 
-    stats: ImportStats = await import_playlist(session, source, body)
+    try:
+        stats: ImportStats = await import_playlist(session, source, body)
+    except PlaylistError as exc:
+        source.last_status = "error"
+        source.last_error = str(exc)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     logger.info(
         "import source=%s parsed=%s created=%s channels=%s",
         source.id,

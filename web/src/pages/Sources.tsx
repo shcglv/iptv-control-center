@@ -168,6 +168,7 @@ export default function Sources() {
               <div className="tiny" style={{ marginTop: 10 }}>
                 Разобрано {stats.parsed}, добавлено {stats.created}, обновлено {stats.updated}, каналов{" "}
                 {stats.channels_created}, привязано {stats.channels_linked}, устарело {stats.stale}
+                {stats.skipped > 0 ? `, пропущено ${stats.skipped}` : ""}
               </div>
             )}
           </form>

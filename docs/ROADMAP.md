@@ -134,6 +134,7 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] Container acceptance test: the built image is exercised end to end, including restart persistence
 - [x] Operations runbook (`docs/RUNBOOK.md`) and preflight checks (`scripts/preflight.py`)
 - [x] Owner acceptance script (`docs/ACCEPTANCE.md`) and deployment plan (`docs/DEPLOYMENT.md`)
+- [x] Provider-corpus hardening: 17 tests over realistic and hostile playlists, plus fixes
 - [ ] Log audit and request IDs
 - [ ] Accessibility and visual regression checks in CI
 - [ ] Execute the deployment plan (blocked: needs owner GO)
