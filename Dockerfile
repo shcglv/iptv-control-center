@@ -14,6 +14,9 @@ ARG PYTHON_IMAGE=python:3.12-slim@sha256:191083cdf6c7bda8c76158983163ead5d5cf7b7
 ARG NODE_IMAGE=node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
 # ffprobe is only needed for IPTV_PROBE_MODE=active; the default image stays small.
 ARG INSTALL_FFMPEG=false
+# pg_dump/pg_restore are only needed to run scripts/backup.py *inside* this container against
+# PostgreSQL. Coolify's database backups and an external pg_dump cover the normal case.
+ARG INSTALL_PG_CLIENT=false
 
 # ---------------------------------------------------------------- web build
 FROM ${NODE_IMAGE} AS web
@@ -43,6 +46,15 @@ ARG INSTALL_FFMPEG
 RUN if [ "$INSTALL_FFMPEG" = "true" ]; then \
       apt-get update \
       && apt-get install -y --no-install-recommends ffmpeg \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# pg_dump/pg_restore are needed by `scripts/backup.py` in a PostgreSQL deployment; the client
+# package is small, unlike the ffmpeg one.
+ARG INSTALL_PG_CLIENT
+RUN if [ "$INSTALL_PG_CLIENT" = "true" ]; then \
+      apt-get update \
+      && apt-get install -y --no-install-recommends postgresql-client \
       && rm -rf /var/lib/apt/lists/*; \
     fi
 

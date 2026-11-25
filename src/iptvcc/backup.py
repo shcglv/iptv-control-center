@@ -95,6 +95,12 @@ def backup_sqlite(database_url: str, destination: Path) -> BackupResult:
     )
 
 
+def _libpq_url(database_url: str) -> str:
+    """Strip the SQLAlchemy driver suffix: libpq does not understand ``postgresql+psycopg://``."""
+    _scheme, separator, rest = database_url.partition("://")
+    return f"postgresql://{rest}" if separator else database_url
+
+
 def backup_postgres(
     database_url: str, destination: Path, *, pg_dump: str | None = None
 ) -> BackupResult:
@@ -111,7 +117,7 @@ def backup_postgres(
         raise BackupError(f"refusing to overwrite an existing backup: {destination}")
 
     completed = subprocess.run(
-        [*prefix, "--format=custom", "--no-owner", f"--dbname={database_url}"],
+        [*prefix, "--format=custom", "--no-owner", f"--dbname={_libpq_url(database_url)}"],
         capture_output=True,
         check=False,
     )

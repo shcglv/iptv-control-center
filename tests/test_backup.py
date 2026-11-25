@@ -97,3 +97,14 @@ def test_create_backup_dispatches_on_scheme(tmp_path: Path, database: tuple[Path
     assert result.engine == "sqlite"
     with pytest.raises(BackupError, match="unsupported"):
         create_backup(tmp_path / "x", "mysql://example/db")
+
+
+def test_sqlalchemy_driver_suffix_is_stripped_for_pg_dump() -> None:
+    """pg_dump speaks libpq, not SQLAlchemy: `postgresql+psycopg://` would be rejected."""
+    from iptvcc.backup import _libpq_url
+
+    assert (
+        _libpq_url("postgresql+psycopg://user:pass@db:5432/iptv")
+        == "postgresql://user:pass@db:5432/iptv"
+    )
+    assert _libpq_url("postgresql://db/iptv") == "postgresql://db/iptv"

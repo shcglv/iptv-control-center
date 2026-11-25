@@ -52,7 +52,8 @@ run proves it; "implemented" means the code exists but no test or run has exerci
 | Request ids + structured request log | ✅ | `test_diagnostics.py` |
 | Backup + verified restore | ✅ SQLite and PostgreSQL | restore drill executed on both; `pg_dump`/`pg_restore` compared identical row counts |
 | Preflight checks | ✅ | 17 tests, exit code 1 on failure |
-| Container image | ✅ | 3 container acceptance tests, UID 10001, 349 MB |
+| Container image | ✅ | 3 container acceptance tests, UID 10001, 367 MB default |
+| Container **with PostgreSQL** | ✅ | `scripts/verify_pg_container.py`: migrations at start, import, resolver, restart persistence, in-container backup (27 tables in the dump) |
 | CI pipeline | ⚠️ written, **never executed** | repository has no remote |
 | Deployment to Coolify | 🚫 blocked | needs owner GO |
 | Real provider + TV acceptance | 🚫 blocked | needs provider credentials and a TV |

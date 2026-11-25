@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] — 2026-11-25
+
+### Added
+
+- `scripts/verify_pg_container.py`: the shape Coolify will deploy, end to end — PostgreSQL by
+  service name on a user network, migrations at container start, admin via the container CLI,
+  import, playlist, 302 resolver, container restart with data intact, and a backup executed inside
+  the application container. Executed: `alembic_version 198a8944b683`, 2 channels before and after
+  the restart, 73 KB dump with 27 table entries.
+- `--build-arg INSTALL_PG_CLIENT=true` puts `pg_dump`/`pg_restore` in the image.
+
+### Fixed
+
+- `scripts/backup.py` passed the SQLAlchemy URL (`postgresql+psycopg://…`) to `pg_dump`, which
+  speaks libpq and silently fell back to a local socket. The driver suffix is now stripped.
+- The image size table is now measured rather than estimated: default **367 MB**, +81 MB with the
+  pg client, +610 MB with ffmpeg.
+
 ## [0.5.1] — 2026-11-25
 
 PostgreSQL is now a supported, verified target rather than a documented intention.

@@ -81,6 +81,17 @@ IPTV_PG_DUMP="docker exec -i <db-container> pg_dump" \
 docker exec <container> python scripts/backup.py --out /data/backup.dump
 ```
 
+The default application image does **not** contain `pg_dump` (it would add 81 MB). Three supported
+ways to back up a PostgreSQL deployment, in order of preference:
+
+1. **Coolify's database backup** — the scheduled job on the managed database.
+2. **From a host with client tools**, using the prefix above or plain `pg_dump`.
+3. **Build the image with `--build-arg INSTALL_PG_CLIENT=true`** and run
+   `docker exec <container> python scripts/backup.py --out /data/backup.dump`.
+
+All three produce the same custom-format dump; option 3 is the one exercised by
+`scripts/verify_pg_container.py`.
+
 For SQLite deployments (development, small installs) `scripts/backup.py` uses the online backup API
 and prints a row count per table plus `PRAGMA integrity_check`.
 

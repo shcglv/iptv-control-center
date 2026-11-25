@@ -58,6 +58,20 @@ EPG ingest 13.8 s, guide 4.9 s.
 | EPG ingest ~44 s for 240 000 programmes | Runs on the import/schedule path, not on a device request. |
 | SQLite single-writer | Production uses PostgreSQL; imports are scheduled rather than interactive. |
 
+## Image variants
+
+Measured with `docker images` after building each variant:
+
+| Build | Size | Why |
+|---|---|---|
+| default | **367 MB** | no ffmpeg, no pg client |
+| `--build-arg INSTALL_PG_CLIENT=true` | **448 MB** | adds `pg_dump`/`pg_restore` (+81 MB) |
+| `--build-arg INSTALL_FFMPEG=true` | **977 MB** | adds ffmpeg for active probing (+610 MB) |
+
+The default image backs up SQLite with the online API but cannot dump PostgreSQL: use Coolify's
+database backups, or build with `INSTALL_PG_CLIENT=true`, or run `scripts/backup.py` from a host that
+has `pg_dump` and point `IPTV_PG_DUMP` at it.
+
 ## Probe modes: what active mode costs
 
 `IPTV_PROBE_MODE=active` adds ffprobe to the image. Measured on this machine:
