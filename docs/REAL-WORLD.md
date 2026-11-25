@@ -61,8 +61,48 @@ RESULT: REAL-WORLD CHECK COMPLETE (3 live resolutions)
   problem, and they came from the public list, not from our code.
 - **No player was involved.** A `HEAD 200` means the URL answers; it does not mean VLC or OwnTV
   decodes it. That is still `ACCEPTANCE.md`.
-- **No EPG.** The public list carries `tvg-id` but no guide; XMLTV was exercised only with fixtures.
+- **The EPG mapping is weak on this pairing.** 13 of 1 028 channels matched a UK guide; the guide
+  was parsed correctly, but identity matching needs the owner's provider, whose `tvg-id`s are the
+  ones its guide will use.
 - **Single run.** Public streams rotate; a later run may find different endpoints dead.
 
 Two of the twelve entries were skipped at import because they were not `http(s)`. That is the
 documented behaviour from the provider corpus, now observed on real data.
+
+## EPG from a real public guide
+
+Fetched the Freeview EPG (`https://raw.githubusercontent.com/dp247/Freeview-EPG/master/epg.xml`,
+20.9 MiB) and ingested it alongside the public playlist:
+
+```
+epg ingest: {'channels': 287, 'programmes': 48814, 'skipped': 0, 'pruned': 0, 'mapped': 13}
+catalog: 1028 channels, 48814 programmes, mapped 13
+  programme: 'Good News on GREAT!' at 1796169360
+```
+
+Reading 48 814 programmes from a 21 MiB document with zero skipped records is the same code path the
+XMLTV corpus exercises, now on a real guide. Only 13 of 1 028 channels mapped because a UK Freeview
+guide and a global news playlist use different channel ids — that is an identity-matching limit, not
+a parser failure. Three other public guide URLs returned HTTP errors, which is why the check treats
+any one working source as success.
+
+## Active probing against real streams
+
+`IPTV_PROBE_MODE=active` with the ffmpeg image, current source mounted, real URLs:
+
+```
+ffprobe binary: /usr/bin/ffprobe
+test-streams.mux.dev        ok          1280x720  h264  streams=10
+2gblive.akamaized.net       no streams  -         -     streams=0
+```
+
+The first line is the positive case: ffprobe read a real HLS stream and reported its real format.
+
+The second line found a genuine gap. That public entry still answers HTTP, and its manifest still
+parses — but its variant playlists return `404`, so ffprobe exits **0** with zero streams. Active
+mode recorded that as healthy, because it only checked ffprobe's exit code. A stream that nothing
+can decode is not healthy, so `MediaInfo` now carries `stream_count`, and a zero-stream inspection
+fails with `ffprobe_no_streams`. Covered by a new test.
+
+This is exactly the class of bug that fixtures cannot produce: the manifest was valid, the HTTP
+status was 200, and the only clue was an empty `streams` array.

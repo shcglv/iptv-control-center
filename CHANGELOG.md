@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-11-25
+
+### Fixed
+
+- **Active probing treated an undecodable stream as healthy.** Found against a real public HLS
+  entry whose variant playlists return 404: ffprobe exits 0 with an empty `streams` array, and the
+  probe only checked the exit code. `MediaInfo` now carries `stream_count`, and a zero-stream
+  inspection fails with `ffprobe_no_streams`.
+- Syntax damage from an earlier automated edit in `health.py` was caught by the test run and fixed
+  before commit.
+
+### Verified on real data
+
+- A public 20.9 MiB XMLTV guide ingested as 287 channels and 48 814 programmes with zero skipped
+  records.
+- ffprobe read a real public HLS stream (1280×720, h264, 10 streams) inside the image, and correctly
+  rejected the streamless manifest above. Details: [`docs/REAL-WORLD.md`](docs/REAL-WORLD.md).
+
 ## [1.0.1] — 2026-11-25
 
 ### Added

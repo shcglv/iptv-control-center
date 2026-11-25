@@ -183,3 +183,21 @@ async def test_active_mode_marks_an_undecodable_stream_as_failed(
     result = await health.probe_stream(_stream(media_server))
     assert result.ok is False
     assert result.error_class == "ffprobe"
+
+
+@pytest.mark.asyncio
+async def test_active_mode_treats_a_streamless_manifest_as_failed(
+    tmp_path: Path, media_server: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ffprobe exits 0 when a manifest's variants are gone; zero streams must not count as healthy."""
+    script = _fake_ffprobe(
+        tmp_path, stdout=json.dumps({"streams": [], "format": {"format_name": "hls"}})
+    )
+    monkeypatch.setattr(
+        health, "ffprobe_command", lambda binary, url, timeout: [sys.executable, str(script), url]
+    )
+    monkeypatch.setattr(get_settings(), "probe_mode", "active", raising=False)
+
+    result = await health.probe_stream(_stream(media_server))
+    assert result.ok is False
+    assert result.error_class == "ffprobe_no_streams"

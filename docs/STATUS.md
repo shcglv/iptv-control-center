@@ -24,14 +24,14 @@ Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 | Devices: hashed token, instant rotation/revocation | ✅ | `test_api.py` |
 | Deterministic per-device playlist, all three EPG attributes | ✅ | container test |
 | **Client Compatibility Engine** (`RenderPlan`) | ❌ not implemented | — |
-| XMLTV ingest: streaming, timezone offsets, retention, replace | ✅ | 19-test EPG corpus |
+| XMLTV ingest: streaming, timezone offsets, retention, replace | ✅ | 19-test EPG corpus; **real public guide**: 287 channels, 48 814 programmes from a 20.9 MiB file (`REAL-WORLD.md`) |
 | Channel↔EPG mapping, mapped ids emitted in the playlist | ✅ | `test_epg.py`, container test |
 | Per-device guide, cached per profile | ✅ | container test, `test_profiles.py` |
 | Smart-TV guide size cap | ❌ not implemented | — |
 | Health probes, aggregates, composite score | ✅ | `test_health.py` |
 | Anti-flapping (+10 margin, 15-min dwell) | ✅ | `test_quality.py`, `test_scheduler.py` |
 | Autonomous scheduler with DB lease and watchdog | ✅ | `test_scheduler.py` |
-| Active probe mode (ffprobe) | ✅ code, ⚠️ unverified against a real provider | `test_active_probe.py` (fake binary); image built with ffprobe 7.1.5 |
+| Active probe mode (ffprobe) | ✅ | `test_active_probe.py` plus a **real stream**: 1280×720 h264 from a public HLS URL; a manifest with zero streams now fails instead of passing (`REAL-WORLD.md`) |
 | Provider connection-slot budget | ❌ not implemented | — |
 | Source Discovery: extractors, RSS/HTML, candidate review | ✅ | `test_discovery.py`, browser test |
 | Channel identity catalog + take-down blocks | ✅ | `test_catalog.py`, browser test |

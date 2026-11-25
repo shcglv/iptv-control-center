@@ -158,6 +158,7 @@ class MediaInfo:
     video_codec: str | None = None
     audio_codec: str | None = None
     bandwidth_bps: int | None = None
+    stream_count: int = 0
     error: str | None = None
 
 
@@ -198,6 +199,7 @@ def parse_ffprobe_json(payload: str) -> MediaInfo:
         video_codec=video.get("codec_name") if video else None,
         audio_codec=audio.get("codec_name") if audio else None,
         bandwidth_bps=bandwidth,
+        stream_count=len(streams),
     )
 
 
@@ -246,6 +248,10 @@ async def probe_stream(stream: Stream, *, timeout: float = PROBE_TIMEOUT) -> Pro
             # Active mode means "can it actually be decoded", so a failed inspection is a failure.
             result.ok = False
             result.error_class = "ffprobe"
+        elif info.stream_count == 0:
+            # ffprobe can exit 0 on a manifest whose variants are gone: no streams is not healthy.
+            result.ok = False
+            result.error_class = "ffprobe_no_streams"
         else:
             result.resolution = info.resolution or result.resolution
             result.video_codec = info.video_codec or result.video_codec
