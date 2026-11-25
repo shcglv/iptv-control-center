@@ -67,7 +67,7 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] Profiles screen: create profile, per-channel visibility, up/down ordering, source pin with live scores
 - [x] Drag-and-drop ordering with a keyboard-accessible fallback and a batch renumber endpoint
 - [x] Profile changes reflect in the playlist and the guide on the next request
-- [ ] Category visibility editor, impact panel ("12 devices affected")
+- [x] Category visibility editor with channel counts (impact panel and preview still absent)
 - [ ] M3U / EPG preview inside the editor
 
 ## P5 — EPG — `[~]`

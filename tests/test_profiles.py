@@ -393,6 +393,58 @@ async def test_profile_order_endpoint_renumbers_in_one_request(
 
 
 @pytest.mark.asyncio
+async def test_category_visibility_hides_a_whole_group(
+    client: httpx.AsyncClient,
+) -> None:
+    source = (
+        await client.post(
+            "/api/v1/sources",
+            json={"name": "M3U", "url": "http://p.test/l.m3u"},
+            headers=ADMIN_HEADERS,
+        )
+    ).json()
+    await client.post(
+        f"/api/v1/sources/{source['id']}/import", json={"m3u": SAMPLE_M3U}, headers=ADMIN_HEADERS
+    )
+    profile = (
+        await client.post("/api/v1/profiles", json={"name": "Groups"}, headers=ADMIN_HEADERS)
+    ).json()
+
+    categories = (
+        await client.get(f"/api/v1/profiles/{profile['id']}/categories", headers=ADMIN_HEADERS)
+    ).json()
+    by_name = {row["name"]: row for row in categories}
+    assert by_name["News"]["channels"] == 2
+    assert by_name["Sport"]["channels"] == 1
+    assert all(row["visible"] for row in categories)
+
+    hidden = await client.put(
+        f"/api/v1/profiles/{profile['id']}/categories/{by_name['News']['id']}",
+        json={"visible": False},
+        headers=ADMIN_HEADERS,
+    )
+    assert hidden.status_code == 204
+
+    after = (
+        await client.get(f"/api/v1/profiles/{profile['id']}/categories", headers=ADMIN_HEADERS)
+    ).json()
+    assert next(row for row in after if row["name"] == "News")["visible"] is False
+
+    device = (
+        await client.post(
+            "/api/v1/devices",
+            json={"name": "Group TV", "profile_id": profile["id"]},
+            headers=ADMIN_HEADERS,
+        )
+    ).json()
+    playlist = (await client.get(f"/p/{device['token']}/live.m3u")).text
+    names = [line.split(",", 1)[1] for line in playlist.splitlines() if line.startswith("#EXTINF")]
+    assert "BBC One HD" not in names
+    assert "CNN" not in names
+    assert "Eurosport 1 [HD]" in names
+
+
+@pytest.mark.asyncio
 async def test_profile_api_validation(client: httpx.AsyncClient) -> None:
     first = await client.post("/api/v1/profiles", json={"name": "Dup"}, headers=ADMIN_HEADERS)
     assert first.status_code == 201

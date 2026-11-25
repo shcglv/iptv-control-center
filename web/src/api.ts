@@ -231,6 +231,28 @@ export const setProfileOrder = (id: number, keys: string[]): Promise<void> =>
     body: JSON.stringify({ channels: keys }),
   });
 
+export interface ProfileCategory {
+  id: number;
+  name: string;
+  display_name: string | null;
+  visible: boolean;
+  sort_index: number | null;
+  channels: number;
+}
+
+export const listProfileCategories = (id: number): Promise<ProfileCategory[]> =>
+  request<ProfileCategory[]>(`/api/v1/profiles/${id}/categories`);
+
+export const setProfileCategory = (
+  id: number,
+  categoryId: number,
+  body: { visible: boolean; sort_index?: number | null; display_name?: string | null },
+): Promise<void> =>
+  request<void>(`/api/v1/profiles/${id}/categories/${categoryId}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+
 export const listChannelSources = (key: string): Promise<ChannelSource[]> =>
   request<ChannelSource[]>(`/api/v1/channels/${key}/sources`);
 

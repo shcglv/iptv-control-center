@@ -730,6 +730,65 @@ class CategoryOverrideIn(BaseModel):
     display_name: str | None = None
 
 
+class ProfileCategoryOut(BaseModel):
+    id: int
+    name: str
+    display_name: str | None
+    visible: bool
+    sort_index: int | None
+    channels: int
+
+
+@app.get(
+    "/api/v1/profiles/{profile_id}/categories",
+    response_model=list[ProfileCategoryOut],
+    tags=["profiles"],
+)
+async def list_profile_categories(
+    profile_id: int, session: SessionDep, _: AdminDep
+) -> list[ProfileCategoryOut]:
+    """Categories with their effective visibility for this profile."""
+    profile = await session.get(PlaylistProfile, profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="profile not found")
+
+    categories = (
+        await session.scalars(select(Category).order_by(Category.sort_index, Category.name))
+    ).all()
+    overrides = {
+        row.category_id: row
+        for row in (
+            await session.scalars(
+                select(ProfileCategory).where(ProfileCategory.profile_id == profile_id)
+            )
+        ).all()
+    }
+    counts = dict(
+        (
+            await session.execute(
+                select(Channel.category_id, func.count())
+                .where(Channel.is_hidden.is_(False))
+                .group_by(Channel.category_id)
+            )
+        ).all()
+    )
+
+    result: list[ProfileCategoryOut] = []
+    for category in categories:
+        override = overrides.get(category.id)
+        result.append(
+            ProfileCategoryOut(
+                id=category.id,
+                name=category.name,
+                display_name=override.display_name if override else None,
+                visible=override.visible if override is not None else True,
+                sort_index=override.sort_index if override else None,
+                channels=int(counts.get(category.id, 0)),
+            )
+        )
+    return result
+
+
 class ProfileOrderIn(BaseModel):
     """Channel public keys in the desired order; index becomes the sort key."""
 

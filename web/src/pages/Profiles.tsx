@@ -5,12 +5,14 @@ import {
   clearProfileChannel,
   createProfile,
   listChannelSources,
+  listProfileCategories,
   listProfileChannels,
   listProfiles,
+  setProfileCategory,
   setProfileChannel,
   setProfileOrder,
 } from "../api";
-import type { ChannelSource, ProfileChannel } from "../api";
+import type { ChannelSource, ProfileCategory, ProfileChannel } from "../api";
 import { Card, ErrorBanner, Loading, StatusPill, useAsync } from "../components";
 
 const BIG = 1_000_000;
@@ -24,6 +26,7 @@ export default function Profiles() {
 
   const profiles = useAsync(listProfiles, [reload]);
   const [rows, setRows] = useState<ProfileChannel[] | null>(null);
+  const [categories, setCategories] = useState<ProfileCategory[] | null>(null);
   const [pinPanel, setPinPanel] = useState<string | null>(null);
   const [sources, setSources] = useState<Record<string, ChannelSource[]>>({});
 
@@ -32,9 +35,17 @@ export default function Profiles() {
   useEffect(() => {
     if (selected === null) {
       setRows(null);
+      setCategories(null);
       return;
     }
     let alive = true;
+    listProfileCategories(selected)
+      .then((data) => {
+        if (alive) setCategories(data);
+      })
+      .catch(() => {
+        if (alive) setCategories([]);
+      });
     listProfileChannels(selected)
       .then((data) => {
         if (alive) setRows(data);
@@ -159,6 +170,25 @@ export default function Profiles() {
     }
   };
 
+  const toggleCategory = async (category: ProfileCategory) => {
+    if (selected === null) return;
+    const next = !category.visible;
+    setCategories((items) =>
+      items?.map((item) => (item.id === category.id ? { ...item, visible: next } : item)) ?? items,
+    );
+    setBusy(true);
+    setError(null);
+    try {
+      await setProfileCategory(selected, category.id, { visible: next });
+      refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Не удалось изменить группу");
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const reset = async (row: ProfileChannel) => {
     if (selected === null) return;
     setBusy(true);
@@ -264,6 +294,29 @@ export default function Profiles() {
           </form>
         </div>
       </Card>
+
+      {current && categories && categories.length > 0 && (
+        <Card title={`Группы · ${current.name}`}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+            {categories.map((category) => (
+              <label key={category.id} className="row" style={{ gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={category.visible}
+                  disabled={busy}
+                  aria-label={`Видимость группы ${category.name}`}
+                  onChange={() => void toggleCategory(category)}
+                />
+                <span>{category.name}</span>
+                <span className="tiny">{category.channels}</span>
+              </label>
+            ))}
+          </div>
+          <p className="tiny" style={{ marginBottom: 0 }}>
+            Снятая группа скрывается у устройств этого профиля; отдельный канал можно вернуть ниже.
+          </p>
+        </Card>
+      )}
 
       {current && (
         <Card

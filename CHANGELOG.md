@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-11-25
+
+### Added
+
+- **Category (group) visibility editor.** The profile screen now lists every category with its
+  channel count and a checkbox; unchecking a group hides its channels for that profile's devices,
+  while an individual channel can still be re-enabled below it.
+- `GET /api/v1/profiles/{id}/categories` returns the effective visibility per category — the missing
+  read side of an endpoint that could previously only be written.
+
+### Notes
+
+- The editor intentionally keeps category-hidden channels in the list and shows them as unchecked,
+  instead of removing rows: an operator needs to see what a group is hiding in order to re-enable one
+  channel from it. A browser test asserts exactly that distinction.
+
 ## [1.2.0] — 2026-11-25
 
 ### Added

@@ -20,7 +20,7 @@ Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 | Manual merge / split / field overrides | ❌ not implemented | — |
 | Playlist profiles: visibility, order, category rules, source pins | ✅ | `test_profiles.py`, drag browser test |
 | Drag-and-drop ordering with keyboard fallback | ✅ | browser test |
-| Category visibility editor, impact panel, in-editor preview | ❌ not implemented | — |
+| Category visibility editor, impact panel, in-editor preview | ✅ categories (visibility + counts); ❌ impact panel and preview | profile screen; `test_profiles.py`, browser test |
 | Devices: hashed token, instant rotation/revocation | ✅ | `test_api.py` |
 | Deterministic per-device playlist, all three EPG attributes | ✅ | container test |
 | **Client Compatibility Engine** (`RenderPlan`) | ✅ | per-family container sets and guide caps: a TS-only channel is absent from an Apple TV playlist and its `.ts` resolver request is refused; `test_capabilities.py` |

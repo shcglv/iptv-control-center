@@ -282,6 +282,50 @@ def feed_server() -> Iterator[str]:
 
 
 @pytest.mark.browser
+def test_profile_group_visibility(live_server: tuple[str, str], tmp_path: Path) -> None:
+    """Unchecking a group must remove its channels from the editor and from the playlist."""
+    base, secret = live_server
+    _seed_catalog(base, secret)
+
+    with playwright_api.sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = _new_page(browser)
+        page.goto(base, wait_until="domcontentloaded")
+        page.wait_for_selector("#email", timeout=15_000)
+        page.fill("#email", "admin@local")
+        page.fill("#password", PASSWORD)
+        page.fill("#totp", pyotp.TOTP(secret).now())
+        page.click("button[type=submit]")
+        page.wait_for_selector("text=Требует внимания", timeout=20_000)
+
+        page.get_by_role("button", name="Плейлисты").click()
+        page.get_by_placeholder("Название профиля").fill("Groups")
+        page.get_by_role("button", name="Создать").click()
+        page.get_by_role("row", name="Groups").get_by_role("button", name="Редактировать").click()
+
+        rows = page.locator("tr[data-key]")
+        rows.first.wait_for(timeout=10_000)
+        assert rows.count() == 3
+
+        group = page.get_by_label("Видимость группы News")
+        group.wait_for(timeout=10_000)
+        assert group.is_checked()
+        group.uncheck()
+
+        # The editor keeps every channel listed but marks category-hidden ones as not visible.
+        deadline = time.time() + 20
+        while time.time() < deadline and page.get_by_label("Видимость BBC One HD").is_checked():
+            time.sleep(0.25)
+        assert not page.get_by_label("Видимость BBC One HD").is_checked()
+        assert not page.get_by_label("Видимость CNN").is_checked()
+        assert page.get_by_label("Видимость Eurosport 1").is_checked()
+
+        page.get_by_role("row", name="Groups").get_by_text("1 / 3").wait_for(timeout=10_000)
+        page.screenshot(path=str(tmp_path / "groups.png"), full_page=True)
+        browser.close()
+
+
+@pytest.mark.browser
 def test_channel_diagnostics_panel(live_server: tuple[str, str], tmp_path: Path) -> None:
     """The "Почему?" button must explain how a channel would resolve."""
     base, secret = live_server
