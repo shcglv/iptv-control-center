@@ -9,8 +9,8 @@ A complete history bundle is prepared next to the project:
 C:\Users\shcgl\Desktop\iptv-control-center-1.0.0.bundle
 ```
 
-Verified: `git bundle verify` reports *"The bundle records a complete history"*, containing
-`refs/heads/main` at `0d6a9d4` and tag `v1.0.0`.
+Verified: `git bundle verify` reports *"The bundle records a complete history"* and lists
+`refs/heads/main` and tag `v1.0.0`.
 
 ## 1. Create an empty repository
 
