@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 import sqlite3
@@ -19,6 +20,10 @@ import subprocess
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+
+# Table names are read from the database file itself, which is data: only identifier-shaped names
+# are counted, so the SQL built from them cannot be influenced by a crafted SQLite file.
+_SAFE_TABLE_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,62}")
 
 
 class BackupError(RuntimeError):
@@ -60,8 +65,12 @@ def _table_counts(connection: sqlite3.Connection) -> dict[str, int]:
     ]
     counts: dict[str, int] = {}
     for name in sorted(names):
-        quoted = '"' + name.replace('"', '""') + '"'
-        counts[name] = int(connection.execute(f"SELECT count(*) FROM {quoted}").fetchone()[0])
+        # The name comes from our own schema, but a SQLite file is data and could be crafted.
+        # Only identifier-shaped names are counted, which makes the interpolation provably safe.
+        if not _SAFE_TABLE_RE.fullmatch(name):
+            continue
+        statement = f'SELECT count(*) FROM "{name}"'  # nosec B608
+        counts[name] = int(connection.execute(statement).fetchone()[0])
     return counts
 
 
@@ -120,7 +129,7 @@ def backup_postgres(
         [*prefix, "--format=custom", "--no-owner", f"--dbname={_libpq_url(database_url)}"],
         capture_output=True,
         check=False,
-    )
+    )  # nosec B603 - fixed binary, argument list, no shell; the URL is operator configuration
     if completed.returncode != 0:
         destination.unlink(missing_ok=True)
         detail = completed.stderr.decode("utf-8", errors="replace").strip()[:500]

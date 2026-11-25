@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iptv-control-center"
-version = "1.0.0"
+version = "1.0.1"
 description = "Self-hosted IPTV control plane: sources, catalog, EPG, quality, devices. Video never transits the server."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -39,6 +39,8 @@ dev = [
   "ruff>=0.7",
   "mypy>=1.13",
   "playwright>=1.40",
+  "bandit>=1.7",
+  "pip-audit>=2.7",
 ]
 
 [tool.setuptools.packages.find]
@@ -79,3 +81,9 @@ packages = ["iptvcc"]
 strict = true
 warn_return_any = true
 disallow_untyped_defs = true
+
+[tool.bandit]
+# subprocess is deliberate: fixed binaries with argument lists and no shell.
+# B105 flags the ipt_ token prefix, which is a constant, not a password.
+skips = ["B404", "B105"]
+exclude_dirs = ["tests", "migrations"]

@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-11-25
+
+### Added
+
+- Dependency audit (`pip-audit`) and static analysis (`bandit`) as a CI job, plus a weekly schedule
+  so a new advisory in a pinned dependency surfaces without a push. First run: **no known
+  vulnerabilities**, no bandit findings. Report: [`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md).
+
+### Fixed
+
+- `backup.py` built SQL from table names read out of the SQLite file without validating them. A
+  crafted database file could not exploit it (identifiers were quoted), but the name is now checked
+  against `[A-Za-z_][A-Za-z0-9_]{0,62}` before use.
+
 ## [1.0.0] — 2026-11-25
 
 First release verified as an artifact. Not deployed; see [`RELEASE.md`](RELEASE.md).

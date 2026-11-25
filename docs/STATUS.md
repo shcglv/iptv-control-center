@@ -53,6 +53,8 @@ Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 | Request ids + structured request log | ✅ | `test_diagnostics.py` |
 | Backup + verified restore | ✅ SQLite and PostgreSQL | restore drill executed on both; `pg_dump`/`pg_restore` compared identical row counts |
 | Preflight checks | ✅ | 17 tests, exit code 1 on failure |
+| Dependency audit + static scan | ✅ Python only | `pip-audit`: no advisories; `bandit`: clean. Container OS packages are **not** scanned — see `SECURITY-AUDIT.md` |
+| SBOM | ❌ not produced | — |
 | Container image | ✅ | 3 container acceptance tests, UID 10001, 367 MB default |
 | Container **with PostgreSQL** | ✅ | `scripts/verify_pg_container.py`: migrations at start, import, resolver, restart persistence, in-container backup (27 tables in the dump) |
 | CI pipeline | ⚠️ written, **never executed** | repository has no remote |
