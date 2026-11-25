@@ -24,7 +24,7 @@ Legend: `[x]` shipped and verified · `[~]` partially shipped · `[ ]` not start
 - [x] SSRF guard
 - [x] Alembic migrations (initial schema, applied by `scripts/start.sh`)
 - [x] Admin password + TOTP login, sessions, CSRF
-- [x] Web UI shell: login, Overview, Channels, Quality, Sources, Devices (Prism tokens)
+- [x] Web UI: login, Overview, Channels, Quality, Discovery, Playlists, Catalog, Sources, Devices (Prism tokens)
 - [ ] Coolify resources: Database + Application + domain + backup + Kuma
 - [x] CI: ruff, mypy, pytest, web typecheck/build, image build and container smoke test
 - [x] Dependabot for pip, npm, actions and the base image
@@ -43,7 +43,7 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [ ] REST connector, manual single-URL source
 - [ ] Durable job queue (Postgres advisory locks) and scheduled refresh
 - [ ] Source history, availability stats, subscription dates
-- [ ] Channels UI (list/grid, filters, drawer)
+- [x] Channels UI: search, pagination, per-channel diagnostics panel
 
 ## P3 — Smart Matching — `[~]`
 
@@ -51,7 +51,7 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] Exact `tvg-id` → exact normalized name → new channel
 - [ ] Review queue for 78–92 % matches
 - [ ] Manual merge / split / reassign, per-field overrides
-- [ ] iptv-org alias seeding (database CSV)
+- [x] Alias seeding through the channel catalog (iptv-org JSON, name + alt_names + country)
 
 ## P4 — Devices and delivery — `[~]`
 
@@ -67,7 +67,7 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] Profiles screen: create profile, per-channel visibility, up/down ordering, source pin with live scores
 - [x] Drag-and-drop ordering with a keyboard-accessible fallback and a batch renumber endpoint
 - [x] Profile changes reflect in the playlist and the guide on the next request
-- [ ] Drag & drop ordering, category visibility editor, impact panel ("12 devices affected")
+- [ ] Category visibility editor, impact panel ("12 devices affected")
 - [ ] M3U / EPG preview inside the editor
 
 ## P5 — EPG — `[~]`
@@ -92,8 +92,8 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] Autonomous scheduling: lease in `scheduler_state`, hot/cold intervals, watchdog
 - [ ] Profile-based T0–T4 tiers (needs per-profile channel visibility)
 - [ ] Provider connection-slot budget per source
-- [ ] Active mode (ffprobe) behind an explicit toggle
-- [ ] Quality Monitor UI and notifications
+- [x] Active mode (ffprobe) behind IPTV_PROBE_MODE; binary needs --build-arg INSTALL_FFMPEG=true (+628 MB)
+- [x] Quality Monitor UI; alerts via the Telegram notification scan
 
 ## P7 — Discovery — `[~]`
 

@@ -123,7 +123,8 @@ Backup, restore, upgrade, secret rotation, monitoring and incident playbooks liv
 [`docs/RUNBOOK.md`](docs/RUNBOOK.md). Deployment to Coolify is planned in
 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (not executed), and the manual pass with a real provider
 and a real TV is [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md). The dated evidence report with every
-suite and its result is [`docs/VERIFICATION.md`](docs/VERIFICATION.md). Performance numbers are in
+suite and its result is [`docs/VERIFICATION.md`](docs/VERIFICATION.md); the
+requirement-by-requirement status is [`docs/STATUS.md`](docs/STATUS.md). Performance numbers are in
 [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
 ```powershell
