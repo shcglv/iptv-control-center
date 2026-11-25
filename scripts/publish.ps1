@@ -13,7 +13,9 @@ param(
     [switch]$AllowDirty
 )
 
-$ErrorActionPreference = "Stop"
+# Native commands here (git, python) write progress to stderr; with "Stop" PowerShell turns that
+# into a fatal NativeCommandError, so failures are detected through $LASTEXITCODE instead.
+$ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
