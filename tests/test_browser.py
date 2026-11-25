@@ -274,6 +274,80 @@ def feed_server() -> Iterator[str]:
 
 
 @pytest.mark.browser
+def test_profile_reorder_by_drag_and_drop(live_server: tuple[str, str], tmp_path: Path) -> None:
+    """Dragging the first channel onto the third must persist a new order."""
+    base, secret = live_server
+    _seed_catalog(base, secret)
+
+    with playwright_api.sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(base, wait_until="domcontentloaded")
+        page.wait_for_selector("#email", timeout=15_000)
+        page.fill("#email", "admin@local")
+        page.fill("#password", PASSWORD)
+        page.fill("#totp", pyotp.TOTP(secret).now())
+        page.click("button[type=submit]")
+        page.wait_for_selector("text=Требует внимания", timeout=20_000)
+
+        page.get_by_role("button", name="Плейлисты").click()
+        page.get_by_placeholder("Название профиля").fill("Drag")
+        page.get_by_role("button", name="Создать").click()
+        page.get_by_role("row", name="Drag").get_by_role("button", name="Редактировать").click()
+
+        rows = page.locator("tr[data-key]")
+        rows.first.wait_for(timeout=10_000)
+        before = rows.evaluate_all("els => els.map(e => e.dataset.name)")
+        assert len(before) >= 3
+        assert page.locator("[data-drag-handle]").count() == len(before)
+
+        # Pointer-driven drag: press the handle of the first row, move onto the third, release.
+        handle = page.locator("[data-drag-handle]").first
+        target_row = rows.nth(2)
+        target_row.scroll_into_view_if_needed()
+        handle_box = handle.bounding_box()
+        target_box = target_row.bounding_box()
+        assert handle_box is not None
+        assert target_box is not None
+        page.mouse.move(
+            handle_box["x"] + handle_box["width"] / 2, handle_box["y"] + handle_box["height"] / 2
+        )
+        page.mouse.down()
+        page.mouse.move(
+            target_box["x"] + target_box["width"] / 2,
+            target_box["y"] + target_box["height"] / 2,
+            steps=15,
+        )
+        page.mouse.up()
+
+        def order() -> list[str]:
+            return rows.evaluate_all("els => els.map(e => e.dataset.name)")
+
+        deadline = time.time() + 15
+        after = order()
+        while time.time() < deadline:
+            after = order()
+            if after[2] == before[0] and after[0] != before[0]:
+                break
+            time.sleep(0.25)
+        assert after[2] == before[0], f"order did not change: {before} -> {after}"
+        assert after[0] == before[1]
+        page.screenshot(path=str(tmp_path / "drag-order.png"), full_page=True)
+
+        # The ↑/↓ buttons remain the keyboard-accessible path and still work.
+        rows.nth(2).get_by_role("button", name="↑").click()
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            after = order()
+            if after[1] == before[0]:
+                break
+            time.sleep(0.25)
+        assert after[1] == before[0], after
+
+        browser.close()
+
+
+@pytest.mark.browser
 def test_catalog_import_and_block(live_server: tuple[str, str], tmp_path: Path) -> None:
     """Import a catalog, then add and remove a take-down block through the panel."""
     base, secret = live_server

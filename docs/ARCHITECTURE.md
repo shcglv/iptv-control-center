@@ -185,6 +185,7 @@ catalog number, so a new profile starts with the full lineup and no seeding of t
 | Channel visibility | `profile_channel.visible = false` hides it; deleting the row restores the catalog default |
 | Category visibility | `profile_category.visible = false` hides the category's channels, **unless** a channel is explicitly re-enabled |
 | Ordering | `sort_index` when set, otherwise the channel number, then id — deterministic |
+| Reordering | pointer drag on the handle or the ↑/↓ buttons; a single midpoint write when an integer slot exists, otherwise one `POST /profiles/{id}/order` renumbers the visible lineup |
 | Group name | `profile_category.display_name` renames the group in the M3U |
 | Source pin | `profile_channel.pinned_stream_id` wins when that stream is playable in the requested container; otherwise ranking takes over |
 

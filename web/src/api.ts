@@ -225,6 +225,12 @@ export const setProfileChannel = (
 export const clearProfileChannel = (id: number, key: string): Promise<void> =>
   request<void>(`/api/v1/profiles/${id}/channels/${key}`, { method: "DELETE" });
 
+export const setProfileOrder = (id: number, keys: string[]): Promise<void> =>
+  request<void>(`/api/v1/profiles/${id}/order`, {
+    method: "POST",
+    body: JSON.stringify({ channels: keys }),
+  });
+
 export const listChannelSources = (key: string): Promise<ChannelSource[]> =>
   request<ChannelSource[]>(`/api/v1/channels/${key}/sources`);
 

@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-11-25
+
+### Added
+
+- **Drag-and-drop channel ordering** in the profile editor: press the handle, move the row, release.
+  The ↑/↓ buttons remain as the keyboard-accessible path and share the same logic.
+- `POST /api/v1/profiles/{id}/order` — renumbers a lineup in one transaction, used when two
+  neighbours already sit on consecutive integers so no midpoint exists.
+
+### Fixed
+
+- **The profile editor was sorted by channel number, not by the effective order.** Any reorder —
+  drag or arrows — was persisted and then visually ignored, because the list re-rendered in catalog
+  order. It now sorts by the same key the playlist uses.
+- The ↑ arrow could move a row two positions when the neighbour's order value collided with the row
+  above it; both arrows now insert at the neighbour's position instead of doing arithmetic on
+  `sort_index`.
+
 ## [0.3.2] — 2026-11-25
 
 XMLTV corpus hardening: 19 tests built from what providers actually emit.

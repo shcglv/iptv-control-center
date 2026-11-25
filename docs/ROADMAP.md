@@ -65,6 +65,7 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 ## P4b — Playlist Studio — `[~]`
 
 - [x] Profiles screen: create profile, per-channel visibility, up/down ordering, source pin with live scores
+- [x] Drag-and-drop ordering with a keyboard-accessible fallback and a batch renumber endpoint
 - [x] Profile changes reflect in the playlist and the guide on the next request
 - [ ] Drag & drop ordering, category visibility editor, impact panel ("12 devices affected")
 - [ ] M3U / EPG preview inside the editor

@@ -717,6 +717,67 @@ class CategoryOverrideIn(BaseModel):
     display_name: str | None = None
 
 
+class ProfileOrderIn(BaseModel):
+    """Channel public keys in the desired order; index becomes the sort key."""
+
+    channels: list[str] = Field(min_length=1, max_length=20000)
+
+
+@app.post(
+    "/api/v1/profiles/{profile_id}/order",
+    status_code=204,
+    tags=["profiles"],
+)
+async def set_profile_order(
+    profile_id: int,
+    payload: ProfileOrderIn,
+    session: SessionDep,
+    _: AdminDep,
+) -> Response:
+    """Renumber a profile's lineup in one transaction.
+
+    Used by drag-and-drop when no integer gap exists between two neighbours; the UI normally moves
+    a single channel with a midpoint value and leaves every other override untouched.
+    """
+    profile = await session.get(PlaylistProfile, profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="profile not found")
+
+    by_key: dict[str, Channel] = {}
+    keys = payload.channels
+    for start in range(0, len(keys), 5000):
+        chunk = keys[start : start + 5000]
+        for channel in (
+            await session.scalars(select(Channel).where(Channel.public_key.in_(chunk)))
+        ).all():
+            by_key[channel.public_key] = channel
+
+    missing = [key for key in keys if key not in by_key]
+    if missing:
+        raise HTTPException(status_code=404, detail=f"unknown channel: {missing[0]}")
+
+    overrides = {
+        row.channel_id: row
+        for row in (
+            await session.scalars(
+                select(ProfileChannel).where(ProfileChannel.profile_id == profile_id)
+            )
+        ).all()
+    }
+
+    for index, key in enumerate(keys, start=1):
+        channel = by_key[key]
+        override = overrides.get(channel.id)
+        if override is None:
+            override = ProfileChannel(profile_id=profile_id, channel_id=channel.id, visible=True)
+            session.add(override)
+            overrides[channel.id] = override
+        override.sort_index = index
+
+    await session.flush()
+    return Response(status_code=204)
+
+
 @app.post("/api/v1/profiles", response_model=ProfileOut, status_code=201, tags=["profiles"])
 async def create_profile(payload: ProfileCreate, session: SessionDep, _: AdminDep) -> ProfileOut:
     existing = await session.scalar(
@@ -759,9 +820,20 @@ async def list_profile_channels(
             select(Channel)
             .where(Channel.is_hidden.is_(False))
             .options(selectinload(Channel.category))
-            .order_by(Channel.number, Channel.id)
         )
     ).all()
+
+    # The editor must show the effective order, not the catalog order, or a reorder looks ignored.
+    def sort_key(channel: Channel) -> tuple[int, int, str]:
+        override = overrides.get(channel.id)
+        order = (
+            override.sort_index
+            if override is not None and override.sort_index is not None
+            else (channel.number if channel.number is not None else 10**9)
+        )
+        return (order, channel.number or 10**9, channel.id)
+
+    all_channels = sorted(all_channels, key=sort_key)
 
     result: list[ProfileChannelOut] = []
     for channel in all_channels:

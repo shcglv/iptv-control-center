@@ -345,6 +345,54 @@ async def test_profile_hiding_also_hides_the_guide(
 
 
 @pytest.mark.asyncio
+async def test_profile_order_endpoint_renumbers_in_one_request(
+    client: httpx.AsyncClient,
+) -> None:
+    source = (
+        await client.post(
+            "/api/v1/sources",
+            json={"name": "M3U", "url": "http://p.test/l.m3u"},
+            headers=ADMIN_HEADERS,
+        )
+    ).json()
+    await client.post(
+        f"/api/v1/sources/{source['id']}/import", json={"m3u": SAMPLE_M3U}, headers=ADMIN_HEADERS
+    )
+    profile = (
+        await client.post("/api/v1/profiles", json={"name": "Order"}, headers=ADMIN_HEADERS)
+    ).json()
+    channels = (
+        await client.get(f"/api/v1/profiles/{profile['id']}/channels", headers=ADMIN_HEADERS)
+    ).json()
+    reversed_keys = [row["public_key"] for row in reversed(channels)]
+
+    response = await client.post(
+        f"/api/v1/profiles/{profile['id']}/order",
+        json={"channels": reversed_keys},
+        headers=ADMIN_HEADERS,
+    )
+    assert response.status_code == 204, response.text
+
+    device = (
+        await client.post(
+            "/api/v1/devices",
+            json={"name": "Order TV", "profile_id": profile["id"]},
+            headers=ADMIN_HEADERS,
+        )
+    ).json()
+    playlist = (await client.get(f"/p/{device['token']}/live.m3u")).text
+    names = [line.split(",", 1)[1] for line in playlist.splitlines() if line.startswith("#EXTINF")]
+    assert names == [row["name"] for row in reversed(channels)]
+
+    unknown = await client.post(
+        f"/api/v1/profiles/{profile['id']}/order",
+        json={"channels": ["pk-does-not-exist"]},
+        headers=ADMIN_HEADERS,
+    )
+    assert unknown.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_profile_api_validation(client: httpx.AsyncClient) -> None:
     first = await client.post("/api/v1/profiles", json={"name": "Dup"}, headers=ADMIN_HEADERS)
     assert first.status_code == 201
