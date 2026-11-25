@@ -1,14 +1,18 @@
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import {
+  acceptMatch,
   addBlock,
   catalogStatus,
+  listMatches,
+  rejectMatch,
+  scanMatches,
   deleteBlock,
   importCatalog,
   listBlocks,
   matchCatalog,
 } from "../api";
-import type { BlockKind, BlockRow, CatalogStatus } from "../api";
+import type { BlockKind, BlockRow, CatalogStatus, MatchSuggestion } from "../api";
 import { Card, ErrorBanner, Loading, StatusPill, formatIso, useAsync } from "../components";
 
 const KIND_LABEL: Record<BlockKind, string> = {
@@ -31,16 +35,56 @@ export default function Catalog() {
 
   const { data, loading, error: loadError } = useAsync(
     async () => {
-      const [status, blocks] = await Promise.all([catalogStatus(), listBlocks()]);
-      return { status, blocks };
+      const [status, blocks, matches] = await Promise.all([
+        catalogStatus(),
+        listBlocks(),
+        listMatches(),
+      ]);
+      return { status, blocks, matches };
     },
     [reload],
   );
 
   const status: CatalogStatus | null = data?.status ?? null;
   const blocks: BlockRow[] = data?.blocks ?? [];
+  const matches: MatchSuggestion[] = data?.matches ?? [];
 
   const refresh = () => setReload((current) => current + 1);
+
+  const runScan = async () => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const stats = await scanMatches();
+      setMessage(`Сравнено пар: ${stats.compared}, новых совпадений: ${stats.created}`);
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Поиск дубликатов не удался");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resolveMatch = async (suggestion: MatchSuggestion, accept: boolean) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      if (accept) {
+        await acceptMatch(suggestion.id);
+        setMessage(`«${suggestion.drop_name}» объединён с «${suggestion.keep_name}».`);
+      } else {
+        await rejectMatch(suggestion.id);
+        setMessage("Совпадение отклонено.");
+      }
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось обработать совпадение");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const loadFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -187,6 +231,62 @@ export default function Catalog() {
           Сопоставление идёт по нормализованному названию и псевдонимам с учётом страны. Нечёткого
           совпадения нет намеренно: ошибочно склеить два канала хуже, чем оставить один без пары.
         </p>
+      </Card>
+
+      <Card
+        title={`Дубликаты каналов${matches.length ? ` · ${matches.length}` : ""}`}
+        actions={
+          <button className="btn btn-sm" onClick={() => void runScan()} disabled={busy}>
+            Найти дубликаты
+          </button>
+        }
+        bodyless
+      >
+        {matches.length === 0 ? (
+          <div className="empty">Совпадений нет. Запустите поиск — он сравнивает похожие названия.</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Оставить</th>
+                <th>Объединить с</th>
+                <th style={{ width: 80 }}>Схожесть</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {matches.map((suggestion) => (
+                <tr key={suggestion.id}>
+                  <td>{suggestion.keep_name}</td>
+                  <td className="muted">{suggestion.drop_name}</td>
+                  <td className="num">{suggestion.score.toFixed(0)}%</td>
+                  <td>
+                    <button
+                      className="btn btn-sm btn-primary"
+                      aria-label={`Объединить ${suggestion.drop_name}`}
+                      onClick={() => void resolveMatch(suggestion, true)}
+                      disabled={busy}
+                    >
+                      Объединить
+                    </button>{" "}
+                    <button
+                      className="btn btn-sm"
+                      aria-label={`Оставить как есть ${suggestion.drop_name}`}
+                      onClick={() => void resolveMatch(suggestion, false)}
+                      disabled={busy}
+                    >
+                      Это разные
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <div className="card-body tiny">
+          Объединение переносит источники и привязку EPG на оставленный канал и удаляет лишний.
+          Автоматически этого не происходит: ошибочно склеить два канала хуже, чем оставить дубль.
+        </div>
       </Card>
 
       <Card title="Блок-лист" bodyless>

@@ -46,6 +46,7 @@ from .models import (
     DiscoveryCandidate,
     EpgChannel,
     EpgSource,
+    MatchSuggestion,
     PlaylistProfile,
     ProfileCategory,
     ProfileChannel,
@@ -80,6 +81,11 @@ from .services.importing import ImportStats, import_playlist
 from .services.profiles import load_channel_overrides, visible_channels
 from .services.scheduler import ProbeScheduler, scheduler_status
 from .services.selector import rank_candidates
+from .services.suggestions import (
+    merge_channels,
+    reject_suggestion,
+    scan_for_duplicates,
+)
 from .telegram import TelegramBot, TelegramClient
 
 logger = logging.getLogger(__name__)
@@ -1046,6 +1052,87 @@ async def _profile_out(session: AsyncSession, profile: PlaylistProfile) -> Profi
         channels_visible=visible,
         channels_total=total,
     )
+
+
+# --- duplicate suggestions ---------------------------------------------------------------------
+
+
+class MatchSuggestionOut(BaseModel):
+    id: int
+    keep_id: str
+    keep_name: str
+    drop_id: str
+    drop_name: str
+    score: float
+    status: str
+    created_at: datetime
+
+
+class MatchScanOut(BaseModel):
+    compared: int
+    created: int
+    skipped: int
+
+
+@app.post("/api/v1/matches/scan", response_model=MatchScanOut, tags=["catalog"])
+async def scan_matches(session: SessionDep, _: AdminDep) -> MatchScanOut:
+    """Find channels whose names are similar but not identical, for a human decision."""
+    stats = await scan_for_duplicates(session)
+    return MatchScanOut(**stats.as_dict())
+
+
+@app.get("/api/v1/matches", response_model=list[MatchSuggestionOut], tags=["catalog"])
+async def list_matches(
+    session: SessionDep, _: AdminDep, status: str = Query(default="new")
+) -> list[MatchSuggestionOut]:
+    statement = select(MatchSuggestion).order_by(MatchSuggestion.id.desc()).limit(200)
+    if status:
+        statement = statement.where(MatchSuggestion.status == status)
+    suggestions = (await session.scalars(statement)).all()
+    if not suggestions:
+        return []
+
+    ids = {row.keep_id for row in suggestions} | {row.drop_id for row in suggestions}
+    names = {
+        row.id: row.display_name
+        for row in (await session.scalars(select(Channel).where(Channel.id.in_(ids)))).all()
+    }
+    return [
+        MatchSuggestionOut(
+            id=row.id,
+            keep_id=row.keep_id,
+            keep_name=names.get(row.keep_id, "—"),
+            drop_id=row.drop_id,
+            drop_name=names.get(row.drop_id, "—"),
+            score=row.score,
+            status=row.status,
+            created_at=row.created_at,
+        )
+        for row in suggestions
+    ]
+
+
+@app.post("/api/v1/matches/{suggestion_id}/accept", status_code=204, tags=["catalog"])
+async def accept_match(suggestion_id: int, session: SessionDep, _: AdminDep) -> Response:
+    suggestion = await session.get(MatchSuggestion, suggestion_id)
+    if suggestion is None:
+        raise HTTPException(status_code=404, detail="suggestion not found")
+    if suggestion.status != "new":
+        raise HTTPException(status_code=409, detail=f"suggestion already {suggestion.status}")
+    try:
+        await merge_channels(session, suggestion)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return Response(status_code=204)
+
+
+@app.post("/api/v1/matches/{suggestion_id}/reject", status_code=204, tags=["catalog"])
+async def reject_match(suggestion_id: int, session: SessionDep, _: AdminDep) -> Response:
+    suggestion = await session.get(MatchSuggestion, suggestion_id)
+    if suggestion is None:
+        raise HTTPException(status_code=404, detail="suggestion not found")
+    await reject_suggestion(session, suggestion)
+    return Response(status_code=204)
 
 
 # --- catalog and blocklist ---------------------------------------------------------------------

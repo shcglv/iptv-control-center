@@ -285,8 +285,28 @@ provider's spelling.
 
 Matching is idempotent: already matched channels are counted as `already` and never re-pointed.
 
-## 6.9 Client compatibility
+## 6.9 Duplicate channels
 
+Import matches exact normalised names, which is the right default — silently merging "BBC One" and
+"BBC One Scotland" would be data loss. The cost: a provider spelling a name slightly differently
+creates a duplicate.
+
+A scan compares channels that share their first word (bucketing keeps this linear; all-pairs on
+10 000 channels would be 50 million comparisons) and scores the normalised keys:
+
+| Score | Action |
+|---|---|
+| equal keys | skipped — import already merged them |
+| ≥ 92 % | skipped — too confident to queue for a human |
+| 78–92 % | recorded as a suggestion |
+| < 78 % | skipped |
+
+Accepting a suggestion merges the two channels: stream links (duplicates dropped, not doubled),
+profile overrides (the kept side wins), and the EPG mapping move to the kept channel, related
+suggestions are discarded, and the duplicate row is deleted. Nothing merges automatically, and both
+the API and the service refuse to re-run a resolved suggestion.
+
+## 6.10 Client compatibility
 A playlist that offers MPEG-TS to an Apple TV has dead channels: AVPlayer does not play raw
 transport streams. OwnTV (ExoPlayer) is the opposite — it plays TS, and a `.ts` URL that answers with
 an HLS manifest breaks it.

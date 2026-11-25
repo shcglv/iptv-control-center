@@ -16,8 +16,8 @@ Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 | Stale marking instead of deletion | ✅ | `test_api.py` |
 | Channel catalog, permanent identity, public keys | ✅ | model + tests |
 | Matching: exact `tvg-id`, normalised name, fuzzy thresholds | ✅ | `test_matching.py` |
-| Fuzzy **review queue** (78–92 %) | ❌ not implemented | — |
-| Manual merge / split / field overrides | ❌ not implemented | — |
+| Fuzzy **review queue** (78–92 %) | ✅ | scan by shared first word + score band, human accept/reject; accepting merges links, overrides and EPG mapping; `test_suggestions.py` + Catalog card |
+| Manual merge / split / field overrides | ✅ merge via the review queue; ❌ split and per-field overrides | — |
 | Playlist profiles: visibility, order, category rules, source pins | ✅ | `test_profiles.py`, drag browser test |
 | Drag-and-drop ordering with keyboard fallback | ✅ | browser test |
 | Category visibility editor, impact panel, in-editor preview | ✅ categories (visibility + counts); ❌ impact panel and preview | profile screen; `test_profiles.py`, browser test |

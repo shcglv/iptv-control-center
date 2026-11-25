@@ -556,3 +556,24 @@ class CatalogBlock(Base):
     value: Mapped[str] = mapped_column(String(255), index=True)
     reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# --- duplicate suggestions ---------------------------------------------------------------------
+
+
+class MatchSuggestion(Base):
+    """Two channels whose names are similar but not identical, awaiting a human decision.
+
+    Created by a scan, never applied automatically: merging two real channels by mistake is much
+    worse than leaving a duplicate to be reviewed.
+    """
+
+    __tablename__ = "match_suggestion"
+    __table_args__ = (UniqueConstraint("keep_id", "drop_id", name="uq_match_suggestion_pair"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    keep_id: Mapped[str] = mapped_column(ForeignKey("channel.id", ondelete="CASCADE"), index=True)
+    drop_id: Mapped[str] = mapped_column(ForeignKey("channel.id", ondelete="CASCADE"), index=True)
+    score: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String(16), default="new", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

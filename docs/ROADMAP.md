@@ -49,8 +49,8 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 
 - [x] Normalisation, region extraction, fuzzy scoring, thresholds
 - [x] Exact `tvg-id` → exact normalized name → new channel
-- [ ] Review queue for 78–92 % matches
-- [ ] Manual merge / split / reassign, per-field overrides
+- [x] Review queue for 78–92 % matches, with a merge that moves links, overrides and EPG mapping
+- [ ] Manual split and per-field overrides
 - [x] Alias seeding through the channel catalog (iptv-org JSON, name + alt_names + country)
 
 ## P4 — Devices and delivery — `[~]`

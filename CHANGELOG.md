@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-11-25
+
+### Added
+
+- **Duplicate review queue.** A scan compares channels that share a first word, scores their
+  normalised names, and records pairs in the 78–92 % band as suggestions — the range where a human
+  should decide. Identical names are skipped (import already merges them) and anything above 92 % is
+  treated as too confident to queue.
+- Accepting a suggestion **merges** the two channels: stream links, profile overrides and the EPG
+  mapping move to the kept channel, duplicate links are dropped rather than doubled, related
+  suggestions are discarded, and the duplicate row is deleted. Rejecting keeps both.
+- `POST /api/v1/matches/scan`, `GET /api/v1/matches`, accept/reject endpoints, and a "Дубликаты
+  каналов" card on the Catalog screen with similarity, `Объединить` and `Это разные`.
+
+### Notes
+
+- Nothing merges automatically. A wrong automatic merge destroys a channel and its EPG mapping;
+  leaving a duplicate is a cosmetic problem. The scan is therefore advisory by design.
+- The service refuses to merge an already-resolved suggestion, not just the API: defence in depth
+  after a test showed the service alone would happily re-run a merge.
+
 ## [1.3.0] — 2026-11-25
 
 ### Added

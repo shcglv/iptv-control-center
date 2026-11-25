@@ -253,6 +253,29 @@ export const setProfileCategory = (
     body: JSON.stringify(body),
   });
 
+export interface MatchSuggestion {
+  id: number;
+  keep_id: string;
+  keep_name: string;
+  drop_id: string;
+  drop_name: string;
+  score: number;
+  status: string;
+  created_at: string;
+}
+
+export const scanMatches = (): Promise<{ compared: number; created: number; skipped: number }> =>
+  request("/api/v1/matches/scan", { method: "POST" });
+
+export const listMatches = (status = "new"): Promise<MatchSuggestion[]> =>
+  request<MatchSuggestion[]>(`/api/v1/matches?status=${encodeURIComponent(status)}`);
+
+export const acceptMatch = (id: number): Promise<void> =>
+  request<void>(`/api/v1/matches/${id}/accept`, { method: "POST" });
+
+export const rejectMatch = (id: number): Promise<void> =>
+  request<void>(`/api/v1/matches/${id}/reject`, { method: "POST" });
+
 export const listChannelSources = (key: string): Promise<ChannelSource[]> =>
   request<ChannelSource[]>(`/api/v1/channels/${key}/sources`);
 
