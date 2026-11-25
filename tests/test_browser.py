@@ -274,6 +274,39 @@ def feed_server() -> Iterator[str]:
 
 
 @pytest.mark.browser
+def test_channel_diagnostics_panel(live_server: tuple[str, str], tmp_path: Path) -> None:
+    """The "Почему?" button must explain how a channel would resolve."""
+    base, secret = live_server
+    _seed_catalog(base, secret)
+
+    with playwright_api.sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(base, wait_until="domcontentloaded")
+        page.wait_for_selector("#email", timeout=15_000)
+        page.fill("#email", "admin@local")
+        page.fill("#password", PASSWORD)
+        page.fill("#totp", pyotp.TOTP(secret).now())
+        page.click("button[type=submit]")
+        page.wait_for_selector("text=Требует внимания", timeout=20_000)
+
+        page.get_by_role("button", name="Каналы").click()
+        diagnose_button = page.get_by_role("button", name="Диагностика BBC One HD")
+        diagnose_button.wait_for(timeout=10_000)
+        diagnose_button.click()
+
+        page.wait_for_selector("text=Почему так: BBC One HD", timeout=10_000)
+        panel = page.locator("section.card").last
+        assert "Seed" in panel.inner_text()
+        assert "ts →" in panel.inner_text()
+        page.screenshot(path=str(tmp_path / "diagnostics.png"), full_page=True)
+
+        page.get_by_role("button", name="Закрыть").click()
+        page.wait_for_selector("text=Почему так: BBC One HD", state="detached", timeout=5_000)
+        browser.close()
+
+
+@pytest.mark.browser
 def test_profile_reorder_by_drag_and_drop(live_server: tuple[str, str], tmp_path: Path) -> None:
     """Dragging the first channel onto the third must persist a new order."""
     base, secret = live_server

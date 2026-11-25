@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-11-25
+
+### Added
+
+- **Request correlation**: every response carries `X-Request-ID` (an incoming one is reused, a
+  generated one otherwise) and every log line includes it.
+- **Structured request log**: one line per request with method, route **template**, status and
+  duration. The template is used deliberately — a raw path would put device tokens in the log.
+- **Channel diagnosis**: `GET /api/v1/channels/{key}/diagnose` returns every source with its score,
+  uptime, probe count, per-container eligibility and the reason it is not used, the resolution for
+  `ts`/`m3u8`/`mpd`, whether a take-down block hides the channel, and per-profile visibility. The
+  panel exposes it through a "Почему?" button on the Channels screen.
+
+### Fixed
+
+- The diagnosis first reported no resolution for unprobed streams: a score of 0 tied with the
+  "nothing selected yet" sentinel. Selection now treats "no candidate" as distinct from "score 0".
+
 ## [0.4.0] — 2026-11-25
 
 ### Added

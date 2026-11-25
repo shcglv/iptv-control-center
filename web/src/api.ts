@@ -351,6 +351,46 @@ export const addBlock = (kind: BlockKind, value: string, reason?: string): Promi
 export const deleteBlock = (id: number): Promise<void> =>
   request<void>(`/api/v1/blocklist/${id}`, { method: "DELETE" });
 
+export interface DiagnosedStream {
+  stream_id: number;
+  source: string;
+  container: string;
+  priority: number;
+  role: string;
+  stale: boolean;
+  score: number;
+  uptime_ratio: number;
+  checks: number;
+  resolution: string | null;
+  eligible: Record<string, boolean>;
+  reasons: string[];
+}
+
+export interface DiagnosedProfile {
+  id: number;
+  name: string;
+  visible: boolean;
+}
+
+export interface Diagnose {
+  public_key: string;
+  name: string;
+  number: number | null;
+  category: string | null;
+  tvg_id: string | null;
+  catalog_id: string | null;
+  hidden: boolean;
+  blocked_by: string | null;
+  active_stream_id: number | null;
+  active_since_epoch: number | null;
+  streams: DiagnosedStream[];
+  resolution: Record<string, number | null>;
+  profiles: DiagnosedProfile[];
+}
+
+export const diagnoseChannel = (key: string): Promise<Diagnose> =>
+  request<Diagnose>(`/api/v1/channels/${key}/diagnose`);
+
 export const schedulerStatus = (): Promise<SchedulerStatus> =>
   request<SchedulerStatus>("/api/v1/scheduler/status");
 

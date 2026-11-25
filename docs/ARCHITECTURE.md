@@ -275,6 +275,28 @@ provider's spelling.
 
 Matching is idempotent: already matched channels are counted as `already` and never re-pointed.
 
+## 6.9 Diagnostics
+
+Two things make a failure explainable instead of mysterious.
+
+**Request correlation.** Every response carries `X-Request-ID`; an incoming value is reused (bounded
+to 64 characters), otherwise a 12-hex id is generated. Every log line is prefixed with it. The
+request log records method, **route template**, status and duration — never the raw path, because
+`/p/<token>/live.m3u` would put a device token in the log. A 404 has no route, so only its first
+path segment is logged.
+
+**Channel diagnosis.** `GET /api/v1/channels/{key}/diagnose` answers "why is this channel not
+playing":
+
+| Field | Meaning |
+|---|---|
+| `streams[]` | every source with score, uptime, probe count, per-container eligibility and a reason list ("помечен устаревшим", "отключён вручную", "ещё не проверялся") |
+| `resolution` | which stream id would be chosen for `ts`, `m3u8` and `mpd` — a `.ts` channel shows `null` for the manifest extensions |
+| `hidden` / `blocked_by` | whether a take-down block is in force, and which one |
+| `profiles[]` | per-profile visibility, including category rules |
+
+The panel exposes this through a "Почему?" button on the Channels screen.
+
 ## 7. Security
 
 | Concern | Control |

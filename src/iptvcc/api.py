@@ -32,6 +32,7 @@ from .auth import (
 )
 from .config import get_settings
 from .db import create_schema, dispose_engine, get_session, get_session_factory
+from .logging_config import RequestContextMiddleware, configure_logging
 from .m3u import PlaylistError
 from .models import (
     AdminUser,
@@ -127,6 +128,8 @@ app = FastAPI(
     summary="Control plane for IPTV: catalog, playlists, source resolution. No media bytes.",
     lifespan=lifespan,
 )
+configure_logging()
+app.add_middleware(RequestContextMiddleware)
 
 
 # --- admin auth --------------------------------------------------------------------------------
@@ -1080,6 +1083,220 @@ async def delete_block(block_id: int, session: SessionDep, _: AdminDep) -> Respo
     await session.delete(block)
     await session.flush()
     return Response(status_code=204)
+
+
+# --- diagnostics -------------------------------------------------------------------------------
+
+
+class DiagnosedStreamOut(BaseModel):
+    stream_id: int
+    source: str
+    container: str
+    priority: int
+    role: str
+    stale: bool
+    score: float
+    uptime_ratio: float
+    checks: int
+    resolution: str | None
+    eligible: dict[str, bool]
+    reasons: list[str]
+
+
+class DiagnosedProfileOut(BaseModel):
+    id: int
+    name: str
+    visible: bool
+
+
+class DiagnoseOut(BaseModel):
+    public_key: str
+    name: str
+    number: int | None
+    category: str | None
+    tvg_id: str | None
+    catalog_id: str | None
+    hidden: bool
+    blocked_by: str | None
+    active_stream_id: int | None
+    active_since_epoch: int | None
+    streams: list[DiagnosedStreamOut]
+    resolution: dict[str, int | None]
+    profiles: list[DiagnosedProfileOut]
+
+
+@app.get(
+    "/api/v1/channels/{public_key}/diagnose",
+    response_model=DiagnoseOut,
+    tags=["catalog"],
+)
+async def diagnose_channel(public_key: str, session: SessionDep, _: AdminDep) -> DiagnoseOut:
+    """Explain how a channel would resolve, and why a source is not used."""
+    channel = await session.scalar(
+        select(Channel)
+        .where(Channel.public_key == public_key)
+        .options(selectinload(Channel.category))
+    )
+    if channel is None:
+        raise HTTPException(status_code=404, detail="channel not found")
+
+    links = (
+        await session.scalars(
+            select(ChannelStream)
+            .where(ChannelStream.channel_id == channel.id)
+            .options(selectinload(ChannelStream.stream))
+            .order_by(ChannelStream.priority, ChannelStream.id)
+        )
+    ).all()
+    sources = {row.id: row for row in (await session.scalars(select(Source))).all()}
+    qualities = (
+        {
+            row.stream_id: row
+            for row in (
+                await session.scalars(
+                    select(StreamQuality).where(
+                        StreamQuality.stream_id.in_([link.stream_id for link in links])
+                    )
+                )
+            ).all()
+        }
+        if links
+        else {}
+    )
+
+    streams: list[DiagnosedStreamOut] = []
+    best_by_container: dict[str, tuple[float, int]] = {}
+    for link in links:
+        stream = link.stream
+        quality = qualities.get(stream.id)
+        source_row = sources.get(stream.source_id)
+        source_name = source_row.name if source_row is not None else "—"
+        stale = bool(stream.is_stale)
+        reasons: list[str] = []
+        if stale:
+            reasons.append("помечен устаревшим: не было в последнем импорте")
+        if link.role == "disabled":
+            reasons.append("отключён вручную")
+        if quality is None:
+            reasons.append("ещё не проверялся планировщиком")
+
+        if stale or link.role == "disabled":
+            score = 0.0
+        else:
+            score = compute(
+                uptime_ratio=quality.uptime_ratio if quality else None,
+                checks=quality.checks if quality else 0,
+                failures=quality.failures if quality else 0,
+                p90_ttfb_ms=quality.p90_ttfb_ms if quality else None,
+                resolution=quality.resolution if quality else None,
+                video_codec=quality.video_codec if quality else None,
+                bandwidth_bps=quality.bandwidth_bps if quality else None,
+                container=stream.container,
+                requested_ext=stream.container,
+            ).total
+
+        eligible = {
+            ext: (not stale and link.role != "disabled" and stream.container == ext)
+            for ext in ("ts", "m3u8", "mpd")
+        }
+        for ext, ok in eligible.items():
+            if not ok:
+                continue
+            # An unprobed stream scores 0 and is still selectable, so "no entry yet" is not a tie.
+            current = best_by_container.get(ext)
+            if current is None or score > current[0]:
+                best_by_container[ext] = (score, stream.id)
+
+        streams.append(
+            DiagnosedStreamOut(
+                stream_id=stream.id,
+                source=source_name,
+                container=stream.container,
+                priority=link.priority,
+                role=link.role,
+                stale=stale,
+                score=round(score, 2),
+                uptime_ratio=quality.uptime_ratio if quality else 0.0,
+                checks=quality.checks if quality else 0,
+                resolution=quality.resolution if quality else None,
+                eligible=eligible,
+                reasons=reasons,
+            )
+        )
+
+    blocks = (await session.scalars(select(CatalogBlock))).all()
+    blocked_by: str | None = None
+    if channel.is_hidden:
+        for block in blocks:
+            if block.kind == "catalog_id" and block.value == channel.catalog_id:
+                blocked_by = f"catalog_id={block.value}"
+                break
+            if block.kind == "tvg_id" and block.value == channel.tvg_id:
+                blocked_by = f"tvg_id={block.value}"
+                break
+            if (
+                block.kind == "name"
+                and channel.match_key
+                and block.value.strip().lower() == (channel.match_key)
+            ):
+                blocked_by = f"name={block.value}"
+                break
+
+    overrides = {
+        row.profile_id: row
+        for row in (
+            await session.scalars(
+                select(ProfileChannel).where(ProfileChannel.channel_id == channel.id)
+            )
+        ).all()
+    }
+    category_overrides = (
+        {
+            row.profile_id: row
+            for row in (
+                await session.scalars(
+                    select(ProfileCategory).where(
+                        ProfileCategory.category_id == channel.category_id
+                    )
+                )
+            ).all()
+        }
+        if channel.category_id is not None
+        else {}
+    )
+
+    profiles: list[DiagnosedProfileOut] = []
+    for profile in (
+        await session.scalars(select(PlaylistProfile).order_by(PlaylistProfile.id))
+    ).all():
+        override = overrides.get(profile.id)
+        if override is not None:
+            visible = override.visible
+        else:
+            category = category_overrides.get(profile.id)
+            visible = category.visible if category is not None else True
+        if channel.is_hidden:
+            visible = False
+        profiles.append(DiagnosedProfileOut(id=profile.id, name=profile.name, visible=visible))
+
+    return DiagnoseOut(
+        public_key=channel.public_key,
+        name=channel.display_name,
+        number=channel.number,
+        category=channel.category.name if channel.category else None,
+        tvg_id=channel.tvg_id,
+        catalog_id=channel.catalog_id,
+        hidden=channel.is_hidden,
+        blocked_by=blocked_by,
+        active_stream_id=channel.active_stream_id,
+        active_since_epoch=channel.active_since_epoch,
+        streams=streams,
+        resolution={
+            ext: (best_by_container[ext][1] if ext in best_by_container else None)
+            for ext in ("ts", "m3u8", "mpd")
+        },
+        profiles=profiles,
+    )
 
 
 # --- discovery ---------------------------------------------------------------------------------
