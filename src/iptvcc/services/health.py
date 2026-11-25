@@ -14,6 +14,7 @@ import asyncio
 import json
 import re
 import socket
+import subprocess
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -201,30 +202,29 @@ def parse_ffprobe_json(payload: str) -> MediaInfo:
 
 
 async def probe_media(url: str, *, binary: str = "ffprobe", timeout: float = 12.0) -> MediaInfo:
-    """Inspect a stream with ffprobe. Any failure is reported, never raised."""
+    """Inspect a stream with ffprobe. Any failure is reported, never raised.
+
+    Runs in a worker thread rather than through ``asyncio.create_subprocess_exec``: the selector
+    event loop (required by psycopg on Windows) does not implement subprocess transports, and the
+    inspection is a short blocking call that concurrency already bounds.
+    """
     command = ffprobe_command(binary, url, timeout)
     try:
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        completed = await asyncio.to_thread(
+            subprocess.run, command, capture_output=True, timeout=timeout + 2
         )
     except FileNotFoundError:
         return MediaInfo(error="ffprobe is not installed")
+    except subprocess.TimeoutExpired:
+        return MediaInfo(error="ffprobe timed out")
     except OSError as exc:
         return MediaInfo(error=f"ffprobe could not start: {exc}")
-    try:
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout + 2)
-    except TimeoutError:
-        process.kill()
-        await process.wait()
-        return MediaInfo(error="ffprobe timed out")
-    if process.returncode != 0:
-        detail = stderr.decode("utf-8", errors="replace").strip().splitlines()
+    if completed.returncode != 0:
+        detail = completed.stderr.decode("utf-8", errors="replace").strip().splitlines()
         return MediaInfo(
-            error=(detail[-1] if detail else f"ffprobe exit {process.returncode}")[:200]
+            error=(detail[-1] if detail else f"ffprobe exit {completed.returncode}")[:200]
         )
-    return parse_ffprobe_json(stdout.decode("utf-8", errors="replace"))
+    return parse_ffprobe_json(completed.stdout.decode("utf-8", errors="replace"))
 
 
 async def probe_stream(stream: Stream, *, timeout: float = PROBE_TIMEOUT) -> ProbeResult:

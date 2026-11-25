@@ -73,8 +73,19 @@ Verify a backup without restoring it:
 docker exec <container> pg_restore --list /data/backup.dump | head
 ```
 
+`scripts/backup.py` streams `pg_dump` to stdout, and accepts a command prefix through `IPTV_PG_DUMP`
+when the client tools live in another container:
+
+```bash
+IPTV_PG_DUMP="docker exec -i <db-container> pg_dump" \
+docker exec <container> python scripts/backup.py --out /data/backup.dump
+```
+
 For SQLite deployments (development, small installs) `scripts/backup.py` uses the online backup API
 and prints a row count per table plus `PRAGMA integrity_check`.
+
+Both paths have been drilled: SQLite by replacing a damaged file, PostgreSQL by dumping, listing and
+restoring into a fresh database and comparing row counts.
 
 ## 4. Restore
 

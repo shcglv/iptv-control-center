@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — 2026-11-25
+
+PostgreSQL is now a supported, verified target rather than a documented intention.
+
+### Added
+
+- **`psycopg[binary]` as a core dependency.** The documented production URL
+  `postgresql+psycopg://…` had no driver installed at all — the container would have failed at
+  startup. This was found by actually pointing the app at PostgreSQL.
+- The whole 231-test suite runs against PostgreSQL 16 via `IPTV_TEST_DATABASE_URL`; CI gained a
+  `backend-postgres` job with a PostgreSQL service.
+- `data/live_pg_backup_drill.py`: seed → `pg_dump` → `pg_restore --list` → restore into a fresh
+  database → compare row counts.
+
+### Fixed
+
+- Windows + PostgreSQL: psycopg's async mode cannot use the default Proactor loop. The test harness,
+  `python -m iptvcc`, and `migrations/env.py` now select the selector loop on Windows
+  (a no-op on the Linux target).
+- `probe_media` no longer needs `asyncio.create_subprocess_exec`, which the selector loop does not
+  implement; ffprobe runs in a worker thread instead, so active probing works on every loop.
+- `backup_postgres` streams `pg_dump` to stdout and accepts a command prefix
+  (`IPTV_PG_DUMP="docker exec -i pg pg_dump"`), so the path is executable without host client tools.
+
 ## [0.5.0] — 2026-11-25
 
 ### Added

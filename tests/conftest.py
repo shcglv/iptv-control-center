@@ -5,7 +5,15 @@ from __future__ import annotations
 import base64
 import os
 import shutil
+import sys
 from pathlib import Path
+
+# psycopg's async mode cannot run on Windows' default Proactor loop. This must happen before
+# pytest-asyncio creates any loop, so it is set at import time.
+if sys.platform == "win32" and os.environ.get("IPTV_TEST_DATABASE_URL"):
+    import asyncio
+
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Configure the app before it is imported anywhere.
 os.environ["IPTV_APP_ENV"] = "test"
@@ -60,11 +68,22 @@ def clean_artifacts() -> Iterator[None]:
     path.mkdir(parents=True, exist_ok=True)
 
 
+TEST_DATABASE_URL = os.environ.get("IPTV_TEST_DATABASE_URL", "")
+
+
 @pytest_asyncio.fixture
 async def session_factory(tmp_path) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path}/test.db")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    if TEST_DATABASE_URL:
+        # Run the same suite against PostgreSQL; the schema is rebuilt per test so tests stay
+        # independent, which is what the SQLite fixture also guarantees.
+        engine = create_async_engine(TEST_DATABASE_URL)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+    else:
+        engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path}/test.db")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         yield factory

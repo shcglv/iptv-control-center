@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from logging.config import fileConfig
 
 from alembic import context
@@ -13,6 +14,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from iptvcc import models  # noqa: F401  (register mappers)
 from iptvcc.config import get_settings
 from iptvcc.db import Base
+
+# psycopg's async mode cannot use Windows' default Proactor loop, and migrations run through an
+# async engine. Production is Linux, where this is a no-op.
+if sys.platform == "win32" and get_settings().database_url.startswith("postgres"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 config = context.config
 if config.config_file_name is not None:

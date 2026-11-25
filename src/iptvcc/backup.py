@@ -11,6 +11,8 @@ how people lose data.
 from __future__ import annotations
 
 import json
+import os
+import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -93,28 +95,34 @@ def backup_sqlite(database_url: str, destination: Path) -> BackupResult:
     )
 
 
-def backup_postgres(database_url: str, destination: Path) -> BackupResult:
-    if shutil.which("pg_dump") is None:
-        raise BackupError("pg_dump is not installed in this environment")
+def backup_postgres(
+    database_url: str, destination: Path, *, pg_dump: str | None = None
+) -> BackupResult:
+    """Stream ``pg_dump`` output into ``destination``.
+
+    ``pg_dump`` may be a command prefix (``IPTV_PG_DUMP="docker exec -i pg pg_dump"``), which is how
+    this path is exercised without client tools installed on the host.
+    """
+    prefix = shlex.split(pg_dump or os.environ.get("IPTV_PG_DUMP") or "pg_dump")
+    if shutil.which(prefix[0]) is None and not Path(prefix[0]).exists():
+        raise BackupError(f"{prefix[0]} is not installed in this environment")
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         raise BackupError(f"refusing to overwrite an existing backup: {destination}")
 
     completed = subprocess.run(
-        [
-            "pg_dump",
-            "--format=custom",
-            "--no-owner",
-            f"--file={destination}",
-            f"--dbname={database_url}",
-        ],
+        [*prefix, "--format=custom", "--no-owner", f"--dbname={database_url}"],
         capture_output=True,
-        text=True,
         check=False,
     )
     if completed.returncode != 0:
         destination.unlink(missing_ok=True)
-        raise BackupError(f"pg_dump failed: {completed.stderr.strip()[:500]}")
+        detail = completed.stderr.decode("utf-8", errors="replace").strip()[:500]
+        raise BackupError(f"pg_dump failed: {detail}")
+    destination.write_bytes(completed.stdout)
+    if destination.stat().st_size == 0:
+        destination.unlink(missing_ok=True)
+        raise BackupError("pg_dump produced an empty file")
     return BackupResult(
         path=str(destination),
         engine="postgres",
@@ -125,11 +133,13 @@ def backup_postgres(database_url: str, destination: Path) -> BackupResult:
     )
 
 
-def create_backup(destination: Path, database_url: str) -> BackupResult:
+def create_backup(
+    destination: Path, database_url: str, *, pg_dump: str | None = None
+) -> BackupResult:
     if database_url.startswith("sqlite"):
         return backup_sqlite(database_url, destination)
     if database_url.startswith(("postgresql", "postgres")):
-        return backup_postgres(database_url, destination)
+        return backup_postgres(database_url, destination, pg_dump=pg_dump)
     raise BackupError(f"unsupported database URL: {database_url.split('://', 1)[0]}")
 
 

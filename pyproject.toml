@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iptv-control-center"
-version = "0.5.0"
+version = "0.5.1"
 description = "Self-hosted IPTV control plane: sources, catalog, EPG, quality, devices. Video never transits the server."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -17,6 +17,8 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.0.36",
   "aiosqlite>=0.20",
   "alembic>=1.13",
+  # Production runs on PostgreSQL; SQLite is the development and test database.
+  "psycopg[binary]>=3.2",
   "pydantic>=2.9",
   "pydantic-settings>=2.6",
   # httpx is a runtime dependency: netguard, the Telegram client and discovery use it.

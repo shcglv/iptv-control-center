@@ -44,13 +44,13 @@ run proves it; "implemented" means the code exists but no test or run has exerci
 | Requirement | Status | Evidence |
 |---|---|---|
 | FastAPI + SQLAlchemy async + Alembic | ✅ | migrations reach `198a8944b683` |
-| PostgreSQL in production | ⚠️ configured, never run | all tests use SQLite |
+| PostgreSQL in production | ✅ verified | the full 231-test suite passes against PostgreSQL 16 (`IPTV_TEST_DATABASE_URL`), CI runs it too |
 | Auth: Argon2id, TOTP, sessions, CSRF | ✅ | `test_auth.py` |
 | Secrets encrypted at rest, masked logs | ✅ | `test_secrets.py`, diagnostics log test |
 | SSRF guard | ✅ | 21-test suite |
 | Public endpoint rate limiting | ✅ | `test_hardening.py` |
 | Request ids + structured request log | ✅ | `test_diagnostics.py` |
-| Backup + verified restore | ✅ SQLite, ⚠️ PostgreSQL path untested | restore drill executed |
+| Backup + verified restore | ✅ SQLite and PostgreSQL | restore drill executed on both; `pg_dump`/`pg_restore` compared identical row counts |
 | Preflight checks | ✅ | 17 tests, exit code 1 on failure |
 | Container image | ✅ | 3 container acceptance tests, UID 10001, 349 MB |
 | CI pipeline | ⚠️ written, **never executed** | repository has no remote |
