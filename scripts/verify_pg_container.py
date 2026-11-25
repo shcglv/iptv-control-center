@@ -6,7 +6,9 @@ acceptance flow over HTTP, a restart, and a backup executed from inside the app 
 
 from __future__ import annotations
 
+import base64
 import json
+import os
 import re
 import subprocess
 import sys
