@@ -82,6 +82,7 @@ async def release_lease(session: AsyncSession, owner: str) -> None:
     )
     await session.commit()
 
+
 async def due_stream_ids(
     session: AsyncSession, *, batch_size: int, hot_seconds: int, cold_seconds: int
 ) -> list[int]:

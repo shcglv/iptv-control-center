@@ -123,9 +123,10 @@ def check_tls(base: str, report: Report) -> None:
     port = parsed.port or 443
     context = ssl.create_default_context()
     try:
-        with socket.create_connection((host, port), timeout=10) as raw, context.wrap_socket(
-            raw, server_hostname=host
-        ) as tls:
+        with (
+            socket.create_connection((host, port), timeout=10) as raw,
+            context.wrap_socket(raw, server_hostname=host) as tls,
+        ):
             cert = tls.getpeercert()
     except (OSError, ssl.SSLError) as exc:
         report.add("tls", FAIL, f"{type(exc).__name__}: {exc}")

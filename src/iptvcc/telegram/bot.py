@@ -165,9 +165,7 @@ class TelegramBot:
             return None
 
         async with self._factory() as session:
-            if not await self._allowed(
-                session, sender_id, sender.get("username")
-            ):
+            if not await self._allowed(session, sender_id, sender.get("username")):
                 await session.commit()
                 return chat_id, "Нет доступа. Этот чат не в списке разрешённых."
 

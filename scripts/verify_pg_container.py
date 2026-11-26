@@ -181,9 +181,7 @@ def main() -> int:
         ).json()["stats"]
         print("import:", stats)
 
-        profile_response = client.post(
-            "/api/v1/profiles", json={"name": "PG"}, headers=headers
-        )
+        profile_response = client.post("/api/v1/profiles", json={"name": "PG"}, headers=headers)
         assert profile_response.status_code == 201, profile_response.text
         profile = profile_response.json()
         device_response = client.post(

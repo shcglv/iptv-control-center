@@ -117,11 +117,7 @@ def parse_attributes(payload: str) -> dict[str, str]:
             continue
 
         start = index
-        while (
-            index < length
-            and not payload[index].isspace()
-            and payload[index] not in ',"\''
-        ):
+        while index < length and not payload[index].isspace() and payload[index] not in ",\"'":
             index += 1
         attrs[key] = payload[start:index]
         if index == start:

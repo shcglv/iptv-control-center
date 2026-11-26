@@ -154,9 +154,7 @@ class BodyLimitMiddleware(BaseHTTPMiddleware):
             if length > limit:
                 return JSONResponse(
                     status_code=413,
-                    content={
-                        "detail": f"request body is {length} bytes; the limit is {limit}"
-                    },
+                    content={"detail": f"request body is {length} bytes; the limit is {limit}"},
                 )
         response: Response = await call_next(request)
         return response
@@ -1184,9 +1182,7 @@ async def system_info(session: SessionDep, _: AdminDep) -> SystemInfoOut:
 @app.get("/api/v1/system/check", response_model=list[SystemCheckOut], tags=["system"])
 async def system_check(session: SessionDep, _: AdminDep) -> list[SystemCheckOut]:
     """The same checks `scripts/preflight.py` runs, from inside the panel."""
-    results = await run_panel_checks(
-        session, get_settings(), alembic_ini=Path("alembic.ini")
-    )
+    results = await run_panel_checks(session, get_settings(), alembic_ini=Path("alembic.ini"))
     return [
         SystemCheckOut(name=item.name, status=item.status, detail=item.detail) for item in results
     ]
