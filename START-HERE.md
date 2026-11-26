@@ -12,6 +12,8 @@ Verified release candidate. **Not deployed anywhere.**
   tests; ten operational drills, the last full run recorded at commit `72f980c` on 2026-11-26.
 - Six security findings were found and fixed; the report is [`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md).
 - What is verified, and what is not, is stated in [`docs/VERIFICATION.md`](docs/VERIFICATION.md).
+- Every requirement from the approved design, with where it lives and how it is proven:
+  [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
 - What is missing on purpose is listed in [`docs/STATUS.md`](docs/STATUS.md).
 
 ## What is blocked, and on whom
