@@ -32,6 +32,29 @@ pessimistic baseline, not as production SLOs.
 At 3 000 channels / 72 000 programmes the same run gives: import 2.1 s, re-run 0.8 s, render 0.36 s,
 EPG ingest 13.8 s, guide 4.9 s.
 
+## Memory, not only time
+
+The container has a fixed budget on the target server: 384 MB for the application. An import that
+spikes above it is an OOM kill, not a slow request, so the benchmark now reports its own high-water
+mark (`peak RSS`, from `resource` on POSIX and `GetProcessMemoryInfo` on Windows).
+
+| Workload | Peak RSS |
+|---|---|
+| 3 000 channels × 10 sources (30 000 streams), 240 000 programmes | **255 MiB** |
+| 10 000 channels × 3 sources (30 000 streams), 240 000 programmes | **259 MiB** |
+
+Both sit about 125 MiB below the 384 MB budget, and the two scales land within 4 MiB of each other —
+the peak is driven by the 38 MiB XMLTV document held in memory for generation, not by the channel
+count.
+
+What the number includes and excludes matters:
+
+- **includes** the generated input (the XMLTV string) and the SQLAlchemy/SQLite stack;
+- **excludes** uvicorn, the HTTP request body for a real upload, and the scheduler;
+- measured on Windows, where SQLite is in-process; PostgreSQL adds its own client buffers.
+
+So treat 260 MiB as a floor for the import path, not as the container's steady-state footprint.
+
 ## Re-measured at 1.6.5
 
 Same tool, deliberately different parameters to check the shape of the curve rather than a single

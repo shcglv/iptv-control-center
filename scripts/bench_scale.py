@@ -16,6 +16,7 @@ import asyncio
 import contextlib
 import os
 import statistics
+import sys
 import tempfile
 import time
 from datetime import UTC, datetime, timedelta
@@ -32,6 +33,52 @@ from iptvcc.security import hash_token
 from iptvcc.services.delivery import build_playlist
 from iptvcc.services.epg import build_guide, ingest_xmltv, map_channels
 from iptvcc.services.importing import import_playlist
+
+
+def peak_rss_mib() -> float | None:
+    """Peak resident memory of this process, on Windows or POSIX."""
+    try:
+        import resource
+    except ImportError:
+        resource = None  # type: ignore[assignment]
+    if resource is not None:
+        usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # Linux reports KiB, macOS bytes.
+        return usage / 1024 / 1024 if sys.platform == "darwin" else usage / 1024
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        class Counters(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        counters = Counters()
+        counters.cb = ctypes.sizeof(counters)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        psapi.GetProcessMemoryInfo.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(Counters),
+            wintypes.DWORD,
+        ]
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+        if psapi.GetProcessMemoryInfo(
+            kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
+        ):
+            return counters.PeakWorkingSetSize / 1024 / 1024
+    return None
 
 
 def build_m3u(channels: int, sources: int) -> str:
@@ -215,6 +262,14 @@ async def run(channels: int, sources: int, epg_channels: int, programmes: int) -
     print("|---|---|---|")
     for name, seconds, note in results:
         print(f"| {name} | {seconds:.2f} s | {note} |")
+
+    # Peak memory matters as much as time: the container has a fixed budget on the target server and
+    # an import that spikes above it is an OOM kill, not a slow request.
+    peak = peak_rss_mib()
+    if peak is not None:
+        print(
+            f"\npeak RSS: {peak:.0f} MiB (process high-water mark, including the generated input)"
+        )
     return 0
 
 
