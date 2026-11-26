@@ -68,12 +68,29 @@ class Stub(BaseHTTPRequestHandler):
         return
 
 
+async def seed_broken_source() -> None:
+    """Give the notification scan something to report: a source whose last import failed."""
+    from iptvcc import db
+    from iptvcc.models import Source
+
+    async with db.get_session_factory()() as session:
+        session.add(
+            Source(
+                name="Drill provider",
+                url="http://p.test/drill.m3u",
+                last_status="error",
+                last_error="drill-failure",
+            )
+        )
+        await session.commit()
+    await db.dispose_engine()
+
+
 def main() -> int:
     if sys.platform == "win32":
         import asyncio
 
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
     DATABASE.unlink(missing_ok=True)
     UPDATES.append(
         [
@@ -107,7 +124,7 @@ def main() -> int:
         "IPTV_TELEGRAM_OWNER_ID": str(OWNER_ID),
         "IPTV_TELEGRAM_API_BASE": f"http://127.0.0.1:{STUB_PORT}",
         "IPTV_TELEGRAM_POLL_TIMEOUT": "1",
-        "IPTV_TELEGRAM_NOTIFY_INTERVAL_SECONDS": "3600",
+        "IPTV_TELEGRAM_NOTIFY_INTERVAL_SECONDS": "2",
     }
 
     migrated = subprocess.run(
@@ -160,7 +177,42 @@ def main() -> int:
         if not text:
             print("RESULT: FAILED - the reply was empty")
             return 5
-        print("RESULT: TELEGRAM DRILL PASSED (polled, authorised, answered)")
+
+        # --- phase 2: an alert fires once, not on every scan ------------------------------------
+        os.environ.update(env)
+        asyncio_module = __import__("asyncio")
+        asyncio_module.run(seed_broken_source())
+        print("seeded a source in the error state; waiting for an alert")
+
+        deadline = time.time() + 30
+        alert = None
+        while time.time() < deadline:
+            for item in REPLIES[1:]:
+                if "Источник" in str(item.get("text", "")):
+                    alert = item
+                    break
+            if alert is not None:
+                break
+            time.sleep(0.5)
+
+        if alert is None:
+            print("RESULT: FAILED - no alert was sent for a failing source")
+            return 6
+        print("alert:", str(alert.get("text", ""))[:100].replace("\n", " | "))
+
+        # The dedupe window must suppress a repeat of the same problem.
+        time.sleep(6)
+        repeats = sum(
+            1
+            for item in REPLIES
+            if "Источник" in str(item.get("text", ""))
+            and "drill-failure" in str(item.get("text", ""))
+        )
+        if repeats != 1:
+            print(f"RESULT: FAILED - the alert was sent {repeats} times; dedupe did not hold")
+            return 7
+
+        print("RESULT: TELEGRAM DRILL PASSED (answered /status, alerted once, dedupe held)")
         return 0
     finally:
         app.terminate()
