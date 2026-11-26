@@ -72,7 +72,10 @@ USER 10001:10001
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# The app is usually ready in ~10 s, but a first boot runs every migration against a cold database.
+# 20 s was optimistic: Docker still logged failures while the schema was being created, and on a busy
+# host three of them after the start period would mark a perfectly healthy container unhealthy.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status==200 else 1)"
 
 CMD ["sh", "/app/scripts/start.sh"]

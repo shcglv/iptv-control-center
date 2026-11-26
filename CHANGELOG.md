@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] — 2026-11-26
+
+### Fixed
+
+- **The container's health start period was too short for a first boot.** The app answers `/healthz`
+  in about ten seconds once the schema exists, but the first start runs every migration against a
+  cold database. With `--start-period=20s` Docker logged failed healthchecks while the schema was
+  being created; on a busy host three failures after the start period would have marked a perfectly
+  healthy container unhealthy, and Coolify would have restarted it. The period is now 60 seconds.
+- `scripts/verify_panel.py` waits for `State.Health.Status == healthy` and fails the drill otherwise,
+  so this class of deployment problem cannot return unnoticed.
+
+### Verified
+
+- Image rebuilt from the changed Dockerfile: `healthy` in 10 s with `FailingStreak=0`, and the panel
+  drill reports the status line alongside its eight checks.
+
 ## [1.7.0] — 2026-11-26
 
 ### Added

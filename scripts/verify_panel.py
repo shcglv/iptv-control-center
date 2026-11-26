@@ -73,6 +73,18 @@ def main() -> int:
         return 2
     try:
         wait_health()
+
+        # Docker's own HEALTHCHECK decides whether Coolify considers the container up. The first
+        # boot runs every migration, so wait for the status rather than assuming it.
+        health = ""
+        for _ in range(60):
+            health = docker("inspect", "--format", "{{.State.Health.Status}}", APP).stdout.strip()
+            if health == "healthy":
+                break
+            time.sleep(2)
+        print(f"  [{('ok' if health == 'healthy' else 'fail'):<4}] healthcheck      {health}")
+        if health != "healthy":
+            return 8
         created = docker(
             "exec",
             APP,

@@ -53,7 +53,7 @@ Fits the current server headroom: ~1.7 GB available, well under the 640 MB budge
 4. **DNS.** A record `iptv.joxit.ru → 176.123.161.28`, **proxy disabled**. The resolver path must not
    go through Cloudflare.
 5. **Environment.** Paste the table above; deploy.
-6. **Watch the log.** Expected order: `alembic upgrade head` reaching `ec324056e4de`, then
+6. **Watch the log.** A first start runs every migration; the image allows 60 s before its health status counts against it. Expected order: `alembic upgrade head` reaching `ec324056e4de`, then
    `Uvicorn running on http://0.0.0.0:8000`, then a `telegram bot started` line if configured.
 7. **Preflight inside the container:**
    ```bash
