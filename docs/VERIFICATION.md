@@ -26,6 +26,18 @@ Drill timings from that run: docs 9.0 s, scheduler 16.6 s, Telegram 19.1 s, pane
 24.6 s, restore 32.4 s, PostgreSQL container 180.2 s. The `smoke` drill is the only one not executed
 here — it needs a deployed base URL, which does not exist yet.
 
+## Re-acceptance at 1.7.0
+
+The probe-concurrency change touched the health path, so the release gate was re-run rather than
+inherited from the 1.6.6 run:
+
+| Check | Result |
+|---|---|
+| Backend, SQLite | **272 passed**, 16 skipped |
+| Backend, PostgreSQL 16 | **272 passed**, 16 skipped, 281 s |
+| Container acceptance, image built from `v1.7.0` | **3 passed**, 39 s |
+| Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
+
 ## One command for the whole matrix
 
 The drills live in separate scripts because each needs something different. `scripts/verify_all.py`
