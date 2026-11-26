@@ -517,3 +517,36 @@ def test_discovery_reviews_a_candidate(
         )
 
         browser.close()
+
+
+@pytest.mark.browser
+def test_the_panel_works_at_phone_width(live_server: tuple[str, str], tmp_path: Path) -> None:
+    """Operators open this on a phone; the layout must not be a horizontal-scrolling mess."""
+    base, secret = live_server
+    _seed_catalog(base, secret)
+
+    with playwright_api.sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(viewport={"width": 390, "height": 844})
+        page.set_default_timeout(30_000)
+        page.goto(base, wait_until="domcontentloaded")
+        page.wait_for_selector("#email", timeout=15_000)
+
+        # The login form must fit without sideways scrolling.
+        overflow = page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
+        assert overflow <= 2, f"login page overflows by {overflow}px"
+
+        page.fill("#email", "admin@local")
+        page.fill("#password", PASSWORD)
+        page.fill("#totp", pyotp.TOTP(secret).now())
+        page.click("button[type=submit]")
+        page.wait_for_selector("text=Требует внимания", timeout=20_000)
+
+        overflow = page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
+        assert overflow <= 2, f"dashboard overflows by {overflow}px"
+
+        # Navigation must remain reachable at this width.
+        page.get_by_role("button", name="Каналы").click()
+        page.wait_for_selector("input[placeholder*='оиск']", timeout=20_000)
+        page.screenshot(path=str(tmp_path / "phone.png"), full_page=True)
+        browser.close()

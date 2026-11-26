@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.6] — 2026-11-26
+
+### Fixed
+
+- **The dashboard overflowed a phone screen by 78 px.** A two-column grid in the Overview page was an
+  inline style no media query could reach, so at 390 px the cards ran off the right edge. It is now
+  a `split-grid` class that collapses to one column below 860 px, the sidebar gets `min-width: 0`
+  (a grid item's default `auto` let the horizontal nav widen the page), and wide tables scroll
+  inside their card instead of the page.
+- A browser test now logs in at 390×844, asserts the document does not scroll sideways on either the
+  login page or the dashboard, and navigates to Channels at that width.
+
 ## [1.6.5] — 2026-11-26
 
 ### Fixed

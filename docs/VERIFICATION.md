@@ -1,7 +1,7 @@
 # Verification report
 
 **Date:** 2026-11-26
-**Version:** 1.6.5 (tagged `v1.6.5`)
+**Version:** 1.6.6 (tagged `v1.6.6`)
 **Environment:** Windows development machine, Python 3.12.0, Docker 29.9.3, Chromium via Playwright
 **Database under test:** SQLite **and PostgreSQL 16** — the full suite passes on both
 
@@ -19,13 +19,13 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 | Upgrade (PostgreSQL) | `scripts/verify_upgrade.py` | **PASSED** — schema at `198a8944b683`, data written through the real import path, upgraded to `head`, rows intact, device playlist still served |
 | Lint | `ruff check src tests scripts` | clean |
 | Types | `mypy src` | clean, 41 files |
-| Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | **7 passed** |
+| Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | **8 passed** — including the panel at 390×844 with zero horizontal overflow |
 | Container | `pytest tests/test_container.py` (`IPTV_CONTAINER_TESTS=1`) | **3 passed**, image rebuilt from HEAD |
 | Real discovery | `pytest tests/test_discovery_live.py` (`IPTV_NETWORK_TESTS=1`) | **2 passed** — a real GitHub page yields an `m3u` link, a real Atom feed parses and correctly yields none |
 | Real public data | `pytest tests/test_real_world.py` (`IPTV_NETWORK_TESTS=1`) | **3 passed** — 1 059-entry public playlist imported to 1 028 channels; 7/12 real streams reachable; 3 channels resolved to real HLS URLs (`HEAD` 200). Details: [`REAL-WORLD.md`](REAL-WORLD.md) |
 | Real EPG + active probe | `data/live_real_epg.py`, ffprobe in the ffmpeg image | 20.9 MiB public guide → 287 channels / 48 814 programmes; ffprobe read a real HLS stream (1280×720 h264) and correctly failed a zero-stream manifest |
 | Real decoder through the 302 | `scripts/verify_decoder.py` | **PASSED** — ffmpeg in a container followed our resolver's 302 to a public HLS stream and decoded 3 s (exit 0, no errors) |
-| Panel checks in the container | `scripts/verify_panel.py` | **PASSED** — 8/8 `ok` in a production-shaped container (`app_env=production`, HTTPS base URL), migrations `ec324056e4de`, version 1.6.5 |
+| Panel checks in the container | `scripts/verify_panel.py` | **PASSED** — 8/8 `ok` in a production-shaped container (`app_env=production`, HTTPS base URL), migrations `ec324056e4de`, version 1.6.6 |
 | Restore (SQLite) | `data/live_restore_drill.py` | **PASSED** |
 | Preflight | `scripts/preflight.py` | 8/8 with a valid key; fails correctly without one |
 | Performance | `scripts/bench_scale.py --channels 3000 --sources 10 --epg-channels 100 --programmes 2400` | import 5.58 s (30 000 streams), re-run 3.17 s, render 0.82 s, EPG 37.67 s (240 000 programmes), guide 2.01 s |

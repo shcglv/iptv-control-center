@@ -84,7 +84,7 @@ export default function Overview() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+      <div className="split-grid">
         <Card title="Требует внимания">
           {attention.length === 0 ? (
             <div className="muted">Проблем не обнаружено.</div>
