@@ -446,3 +446,24 @@ export const epgStatus = (): Promise<EpgStatus> => request<EpgStatus>("/api/v1/e
 
 export const healthStreams = (limit = 50): Promise<StreamHealth[]> =>
   request<StreamHealth[]>(`/api/v1/health/streams?limit=${limit}`);
+
+export interface SystemInfo {
+  version: string;
+  app_env: string;
+  database: string;
+  migrations: string | null;
+  channels: number;
+  sources: number;
+  devices: number;
+  profiles: number;
+}
+
+export interface SystemCheck {
+  name: string;
+  status: string;
+  detail: string;
+}
+
+export const systemInfo = (): Promise<SystemInfo> => request<SystemInfo>("/api/v1/system/info");
+
+export const systemCheck = (): Promise<SystemCheck[]> => request<SystemCheck[]>("/api/v1/system/check");

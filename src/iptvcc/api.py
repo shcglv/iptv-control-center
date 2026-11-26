@@ -56,6 +56,7 @@ from .models import (
     StreamQuality,
 )
 from .netguard import UnsafeUrlError, fetch_text
+from .preflight import run_panel_checks
 from .quality import compute
 from .ratelimit import public_rate_limit
 from .secrets import decrypt, mask_url
@@ -1052,6 +1053,60 @@ async def _profile_out(session: AsyncSession, profile: PlaylistProfile) -> Profi
         channels_visible=visible,
         channels_total=total,
     )
+
+
+# --- system ------------------------------------------------------------------------------------
+
+
+class SystemCheckOut(BaseModel):
+    name: str
+    status: str
+    detail: str
+
+
+class SystemInfoOut(BaseModel):
+    version: str
+    app_env: str
+    database: str
+    migrations: str | None
+    channels: int
+    sources: int
+    devices: int
+    profiles: int
+
+
+@app.get("/api/v1/system/info", response_model=SystemInfoOut, tags=["system"])
+async def system_info(session: SessionDep, _: AdminDep) -> SystemInfoOut:
+    """What is running, against which database, and how much of it."""
+    # A savepoint keeps the request transaction usable when the table does not exist yet.
+    applied: str | None = None
+    try:
+        async with session.begin_nested():
+            applied = await session.scalar(text("SELECT version_num FROM alembic_version"))
+    except Exception:
+        applied = None
+    engine = get_settings().database_url.split("://", 1)[0].split("+", 1)[0]
+    return SystemInfoOut(
+        version=__version__,
+        app_env=get_settings().app_env,
+        database=engine,
+        migrations=applied,
+        channels=await session.scalar(select(func.count()).select_from(Channel)) or 0,
+        sources=await session.scalar(select(func.count()).select_from(Source)) or 0,
+        devices=await session.scalar(select(func.count()).select_from(Device)) or 0,
+        profiles=await session.scalar(select(func.count()).select_from(PlaylistProfile)) or 0,
+    )
+
+
+@app.get("/api/v1/system/check", response_model=list[SystemCheckOut], tags=["system"])
+async def system_check(session: SessionDep, _: AdminDep) -> list[SystemCheckOut]:
+    """The same checks `scripts/preflight.py` runs, from inside the panel."""
+    results = await run_panel_checks(
+        session, get_settings(), alembic_ini=Path("alembic.ini")
+    )
+    return [
+        SystemCheckOut(name=item.name, status=item.status, detail=item.detail) for item in results
+    ]
 
 
 # --- duplicate suggestions ---------------------------------------------------------------------

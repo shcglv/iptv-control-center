@@ -53,20 +53,23 @@ Fits the current server headroom: ~1.7 GB available, well under the 640 MB budge
 4. **DNS.** A record `iptv.joxit.ru → 176.123.161.28`, **proxy disabled**. The resolver path must not
    go through Cloudflare.
 5. **Environment.** Paste the table above; deploy.
-6. **Watch the log.** Expected order: `alembic upgrade head` reaching `198a8944b683`, then
+6. **Watch the log.** Expected order: `alembic upgrade head` reaching `ec324056e4de`, then
    `Uvicorn running on http://0.0.0.0:8000`, then a `telegram bot started` line if configured.
 7. **Preflight inside the container:**
    ```bash
    docker exec <container> python scripts/preflight.py
    ```
-   Expected `0 failed`. Do not continue on a failure.
+   Expected `0 failed`. Do not continue on a failure. The same eight checks are available from the
+   panel — Overview → **Система** → `Проверить` — which is the easier option when you have no shell
+   at hand.
 8. **First admin:**
    ```bash
    docker exec -it <container> python -m iptvcc.cli create-admin --email you@example.com --password '<12+ chars>'
    ```
    Store the TOTP secret immediately.
 9. **Verify:** `https://iptv.joxit.ru/healthz` returns `{"status":"ok"}`; the login page renders;
-   `/api/v1/scheduler/status` is reachable after login.
+   `/api/v1/scheduler/status` is reachable after login; and the Overview **Система** card shows the
+   expected version with `Проверить` reporting `0` failures.
 10. **Backups.** Enable the Coolify schedule and confirm one backup exists; verify with
     `pg_restore --list`.
 11. **Monitoring.** Add the Kuma check.

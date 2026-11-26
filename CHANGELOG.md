@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — 2026-11-26
+
+### Added
+
+- **System panel.** `GET /api/v1/system/info` reports version, environment, database engine,
+  applied migration and entity counts; `GET /api/v1/system/check` runs the same eight checks as
+  `scripts/preflight.py`, but from inside the running process. The Overview screen shows both, with
+  a `Проверить` button.
+- Useful exactly at deployment time: an operator can confirm the container is wired correctly
+  (key, base URL, timezone, artifacts directory, database, migrations) without shell access.
+
+### Notes
+
+- The panel checks reuse the request's own session for database and migration verdicts, so they test
+  the connection the app actually uses rather than a second one opened from configuration.
+- An unmigrated database is reported as a failed check, not an error page: `/system/info` reads
+  `alembic_version` inside a savepoint and returns `null` when the table does not exist yet.
+
 ## [1.4.1] — 2026-11-26
 
 ### Fixed

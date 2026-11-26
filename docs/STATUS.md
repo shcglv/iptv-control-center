@@ -53,7 +53,7 @@ Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 | Public endpoint rate limiting | ✅ | `test_hardening.py` |
 | Request ids + structured request log | ✅ | `test_diagnostics.py` |
 | Backup + verified restore | ✅ SQLite and PostgreSQL | restore drill executed on both; `pg_dump`/`pg_restore` compared identical row counts |
-| Preflight checks | ✅ | 17 tests, exit code 1 on failure |
+| Preflight checks | ✅ | 17 tests, exit code 1 on failure; also available in the panel (`/system/check`, Overview card) |
 | Dependency audit + static scan | ✅ Python only | `pip-audit`: no advisories; `bandit`: clean. Container OS packages are **not** scanned — see `SECURITY-AUDIT.md` |
 | SBOM | ❌ not produced | — |
 | Container image | ✅ | 3 container acceptance tests, UID 10001, 367 MB default |

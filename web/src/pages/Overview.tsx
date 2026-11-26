@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   epgStatus,
   healthStreams,
@@ -5,24 +6,44 @@ import {
   listDevices,
   listSources,
   schedulerStatus,
+  systemCheck,
+  systemInfo,
 } from "../api";
+import type { SystemCheck } from "../api";
 import { Card, ErrorBanner, Loading, StatusPill, formatEpoch, useAsync } from "../components";
 
 export default function Overview() {
+  const [checks, setChecks] = useState<SystemCheck[] | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
+
   const { data, error, loading } = useAsync(
     async () => {
-      const [scheduler, epg, sources, devices, channels, streams] = await Promise.all([
+      const [scheduler, epg, sources, devices, channels, streams, system] = await Promise.all([
         schedulerStatus(),
         epgStatus(),
         listSources(),
         listDevices(),
         listChannels("", 1, 0),
         healthStreams(6),
+        systemInfo(),
       ]);
-      return { scheduler, epg, sources, devices, channels, streams };
+      return { scheduler, epg, sources, devices, channels, streams, system };
     },
     [],
   );
+
+  const runChecks = async () => {
+    setChecking(true);
+    setCheckError(null);
+    try {
+      setChecks(await systemCheck());
+    } catch (err) {
+      setCheckError(err instanceof Error ? err.message : "Проверка не удалась");
+    } finally {
+      setChecking(false);
+    }
+  };
 
   if (loading) return <Loading />;
   if (error) return <ErrorBanner message={error} />;
@@ -126,6 +147,65 @@ export default function Overview() {
             </tbody>
           </table>
         )}
+      </Card>
+
+      <Card
+        title="Система"
+        actions={
+          <button className="btn btn-sm" onClick={() => void runChecks()} disabled={checking}>
+            {checking ? "Проверяем…" : "Проверить"}
+          </button>
+        }
+      >
+        <div className="row" style={{ flexWrap: "wrap", gap: 24, marginBottom: 12 }}>
+          <div>
+            <div className="tiny">Версия</div>
+            <div>{data.system.version}</div>
+          </div>
+          <div>
+            <div className="tiny">База данных</div>
+            <div>{data.system.database}</div>
+          </div>
+          <div>
+            <div className="tiny">Миграции</div>
+            <div className="muted">{data.system.migrations ?? "не применены"}</div>
+          </div>
+          <div>
+            <div className="tiny">Окружение</div>
+            <div className="muted">{data.system.app_env}</div>
+          </div>
+        </div>
+        {checkError && <ErrorBanner message={checkError} />}
+        {checks && (
+          <table>
+            <thead>
+              <tr>
+                <th>Проверка</th>
+                <th style={{ width: 90 }}>Статус</th>
+                <th>Детали</th>
+              </tr>
+            </thead>
+            <tbody>
+              {checks.map((check) => (
+                <tr key={check.name}>
+                  <td>{check.name}</td>
+                  <td>
+                    <StatusPill
+                      tone={check.status === "ok" ? "ok" : check.status === "fail" ? "err" : "warn"}
+                    >
+                      {check.status}
+                    </StatusPill>
+                  </td>
+                  <td className="muted">{check.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="tiny" style={{ marginBottom: 0 }}>
+          Проверка выполняется на сервере и не требует доступа к его консоли — то же, что
+          запускает <code>scripts/preflight.py</code>.
+        </p>
       </Card>
     </div>
   );

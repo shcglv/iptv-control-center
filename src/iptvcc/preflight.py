@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from .config import Settings
 from .secrets import is_development_key
@@ -143,6 +143,40 @@ async def check_migrations(database_url: str, alembic_ini: Path | None = None) -
     return CheckResult("migrations", OK, str(head))
 
 
+async def check_database_session(session: AsyncSession) -> CheckResult:
+    """Database reachability through the request's own session (used by the panel)."""
+    try:
+        await session.execute(text("SELECT 1"))
+    except Exception as exc:
+        return CheckResult("database", FAIL, str(exc).splitlines()[0][:200])
+    return CheckResult("database", OK, "session connected")
+
+
+async def check_migrations_session(
+    session: AsyncSession, alembic_ini: Path | None = None
+) -> CheckResult:
+    """Applied revision versus the revision files, through the request's session."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    ini = alembic_ini or Path("alembic.ini")
+    if not ini.is_file():
+        return CheckResult("migrations", WARN, "alembic.ini not found; cannot compare revisions")
+    try:
+        head = ScriptDirectory.from_config(Config(str(ini))).get_current_head()
+    except Exception as exc:
+        return CheckResult("migrations", WARN, f"cannot read revisions: {exc}")
+    try:
+        current = await session.scalar(text("SELECT version_num FROM alembic_version"))
+    except Exception as exc:
+        return CheckResult("migrations", FAIL, f"cannot read alembic_version: {str(exc)[:160]}")
+    if current is None:
+        return CheckResult("migrations", FAIL, "database has no applied migration")
+    if current != head:
+        return CheckResult("migrations", FAIL, f"database at {current}, head is {head}")
+    return CheckResult("migrations", OK, str(head))
+
+
 async def run_preflight(
     settings: Settings, *, alembic_ini: Path | None = None, database_url: str | None = None
 ) -> list[CheckResult]:
@@ -157,6 +191,22 @@ async def run_preflight(
         await check_migrations(database_url or settings.database_url, alembic_ini),
     ]
     return checks
+
+
+async def run_panel_checks(
+    session: AsyncSession, settings: Settings, *, alembic_ini: Path | None = None
+) -> list[CheckResult]:
+    """The same checks the CLI runs, but reusing the request session for the database verdicts."""
+    return [
+        check_encryption_key(settings),
+        check_public_base_url(settings),
+        check_timezone(settings),
+        check_telegram(settings),
+        check_rate_limit(settings),
+        check_artifacts_dir(settings),
+        await check_database_session(session),
+        await check_migrations_session(session, alembic_ini),
+    ]
 
 
 def has_failures(results: list[CheckResult]) -> bool:
