@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] — 2026-11-26
+
+### Added
+
+- **Per-host probe concurrency** (`IPTV_PROBE_HOST_CONCURRENCY`, default 2). The probe round had one
+  global semaphore, so a batch of 25 streams behind a single provider host could all be requested at
+  once. Providers see a host, not a count: each host now has its own semaphore, and raising
+  `IPTV_PROBE_CONCURRENCY` no longer lets one source absorb the whole batch.
+- `test_health.py::test_probe_round_caps_concurrency_per_host` proves the cap by driving eight
+  streams across two hosts and asserting the observed peak. Raising the limit to 99 makes the test
+  fail, so it measures the cap rather than the code's shape.
+
+### Notes
+
+- This closes the last item in the plan that carried deployment risk: a provider throttling or
+  banning the server on its first hour of probing.
+
 ## [1.6.6] — 2026-11-26
 
 ### Fixed

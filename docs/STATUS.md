@@ -1,6 +1,6 @@
 # Status against the specification
 
-**Version 1.6.6 · 2026-11-26 · tagged `v1.6.6`**
+**Version 1.7.0 · 2026-11-26 · tagged `v1.7.0`**
 
 What exists, what does not, and how each claim is verified. "Verified" means a test or a recorded
 run proves it; "implemented" means the code exists but no test or run has exercised it end to end.
@@ -33,7 +33,7 @@ Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 | Anti-flapping (+10 margin, 15-min dwell) | ✅ | `test_quality.py`, `test_scheduler.py` |
 | Autonomous scheduler with DB lease and watchdog | ✅ | `test_scheduler.py` |
 | Active probe mode (ffprobe) | ✅ | `test_active_probe.py` plus a **real stream**: 1280×720 h264 from a public HLS URL; a manifest with zero streams now fails instead of passing (`REAL-WORLD.md`) |
-| Provider connection-slot budget | ❌ not implemented | — |
+| Provider connection-slot budget | ✅ per-host probe concurrency (IPTV_PROBE_HOST_CONCURRENCY, default 2) | test_health.py::test_probe_round_caps_concurrency_per_host |
 | Source Discovery: extractors, RSS/HTML, candidate review | ✅ | `test_discovery.py`, browser test |
 | Channel identity catalog + take-down blocks | ✅ | `test_catalog.py`, browser test |
 | Authenticated forum sessions, scheduled re-crawls | ❌ not implemented | — |

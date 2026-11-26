@@ -18,7 +18,7 @@ import subprocess
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
-from urllib.parse import urlsplit
+from urllib.parse import urlparse, urlsplit
 
 import httpx
 from sqlalchemy import delete, select
@@ -291,9 +291,22 @@ async def run_probe_round(
 
     settings = get_settings()
     semaphore = asyncio.Semaphore(max(1, settings.probe_concurrency))
+    # A provider sees one host. The global semaphore caps total work, but without a per-host cap a
+    # single source could still receive every concurrent probe in the batch and throttle us.
+    host_semaphores: dict[str, asyncio.Semaphore] = {}
+    per_host = max(1, settings.probe_host_concurrency)
+
+    def host_of(url: str) -> str:
+        return urlparse(url).hostname or "unknown"
+
+    def host_sem(host: str) -> asyncio.Semaphore:
+        if host not in host_semaphores:
+            host_semaphores[host] = asyncio.Semaphore(per_host)
+        return host_semaphores[host]
 
     async def run(stream: Stream) -> tuple[Stream, ProbeResult]:
-        async with semaphore:
+        host = host_sem(host_of(decrypt(stream.url_enc)))
+        async with semaphore, host:
             return stream, await probe_stream(stream)
 
     results = await asyncio.gather(*(run(stream) for stream, _quality in rows))

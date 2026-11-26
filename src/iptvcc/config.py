@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     # Probe depth: passive reads 2 KB over HTTP; active also runs ffprobe on the stream.
     probe_mode: str = "passive"
     probe_concurrency: int = 2
+    # A single provider should not receive every concurrent probe in a batch.
+    probe_host_concurrency: int = 2
     ffprobe_path: str = "ffprobe"
     ffprobe_timeout_seconds: int = 12
 

@@ -258,3 +258,59 @@ async def test_resolver_rejects_wrong_container(
     async with session_factory() as session:
         channel, _good, _bad = await _seed_two_streams(session, good_uptime=1.0, bad_uptime=0.1)
         assert await resolve_stream(session, channel.public_key, "m3u8") is None
+
+
+@pytest.mark.asyncio
+async def test_probe_round_caps_concurrency_per_host(
+    session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One provider must not receive the whole batch at once, whatever the global limit is."""
+    import asyncio
+    from collections import defaultdict
+
+    from iptvcc.config import get_settings
+    from iptvcc.models import Stream
+    from iptvcc.secrets import encrypt
+    from iptvcc.services import health
+
+    active: dict[str, int] = defaultdict(int)
+    peak: dict[str, int] = defaultdict(int)
+
+    async def fake_probe(stream: Stream, *, timeout: float = 8.0) -> health.ProbeResult:
+        from urllib.parse import urlparse
+
+        host = urlparse(health.decrypt(stream.url_enc)).hostname or "unknown"
+        active[host] += 1
+        peak[host] = max(peak[host], active[host])
+        await asyncio.sleep(0.02)
+        active[host] -= 1
+        return health.ProbeResult(ok=True, ttfb_ms=1.0)
+
+    monkeypatch.setattr(health, "probe_stream", fake_probe)
+    monkeypatch.setattr(get_settings(), "probe_concurrency", 6, raising=False)
+    monkeypatch.setattr(get_settings(), "probe_host_concurrency", 2, raising=False)
+
+    async with session_factory() as session:
+        source = Source(name="S", url="http://p.test/l.m3u")
+        session.add(source)
+        await session.flush()
+        for index in range(8):
+            host = "a.test" if index % 2 == 0 else "b.test"
+            session.add(
+                Stream(
+                    source_id=source.id,
+                    stream_key=f"k{index}",
+                    stream_hash=f"h{index}",
+                    name=f"Channel {index}",
+                    url_enc=encrypt(f"http://{host}/stream{index}.ts"),
+                    container="ts",
+                )
+            )
+        await session.commit()
+
+        stats = await health.run_probe_round(session, limit=20)
+        await session.commit()
+
+    assert stats["probed"] == 8
+    assert peak["a.test"] <= 2, peak
+    assert peak["b.test"] <= 2, peak
