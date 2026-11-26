@@ -43,6 +43,25 @@ device playlist: 1028 channels, 276 KiB
 RESULT: REAL-WORLD CHECK COMPLETE (3 live resolutions)
 ```
 
+## A player was attempted, and failed to be automated
+
+VLC 3.x is installed on the development machine, so the obvious next step was to play our playlist
+through a real player. It could not be driven headlessly:
+
+- `vlc --intf dummy --vout dummy --aout dummy --play-and-exit --run-time 5 <url>` returns
+  `0xC0000005` (access violation) on exit, so the exit code says nothing about playback.
+- With `--file-logging` and a remote HLS URL the same invocation does not terminate within three
+  minutes, even with `--run-time`.
+- Against our playlist URL, the server log showed **zero** requests: VLC never fetched it.
+
+Two server-side hypotheses were eliminated: VLC's single-instance mode (`--no-one-instance`) and
+Python stdout buffering in the server child (`PYTHONUNBUFFERED=1`). Neither changed the result.
+
+**Conclusion:** player-level verification is not automatable in this environment, and this document
+does not claim it. `ACCEPTANCE.md` on a real television remains the only way to prove a player
+decodes what we serve. The attempt is recorded because "we tried and it did not work" is more useful
+to the next person than silence.
+
 ## What this proves
 
 - **A real-world playlist parses.** 1 059 entries became 1 028 channels and 1 057 streams across 27
