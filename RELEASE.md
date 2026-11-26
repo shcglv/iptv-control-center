@@ -1,11 +1,11 @@
-# Release 1.0.0
+# Release 1.5.0
 
-The first release that is verified end to end as an artifact: backend on both databases, browser,
-container, and both backup drills. **It has not been deployed anywhere yet** — that is step 10.
+Verified end to end as an artifact: backend on both databases, browser, container, both backup drills, a real public playlist and guide, a real decoder through the 302, and the panel's own preflight inside the image. **It has not been deployed anywhere yet** — that is step 10.
 
-- Version: `1.0.0`
+- Version: `1.5.0`
 - Image: built from this commit, 367 MB default
-- Evidence: [`VERIFICATION.md`](VERIFICATION.md) · status: [`STATUS.md`](STATUS.md)
+- Evidence: [`docs/VERIFICATION.md`](docs/VERIFICATION.md) · status:
+  [`docs/STATUS.md`](docs/STATUS.md)
 
 ## What it does
 
@@ -13,8 +13,9 @@ A self-hosted control plane for IPTV. It imports provider playlists, keeps one c
 serves a per-device M3U and XMLTV guide, picks the best source per channel from health data, and
 answers playback with a `302` straight to the provider. **It never carries video.**
 
-Screens: Overview, Channels (with per-channel diagnostics), Quality, Discovery, Playlists, Catalog,
-Sources, Devices. Telegram bot for status and alerts. Backups, preflight and a runbook.
+Screens: Overview (with a system check), Channels (with per-channel diagnostics), Quality, Discovery,
+Playlists (with group visibility), Catalog (with a duplicate review queue), Sources, Devices. Telegram
+bot for status and alerts. Backups, preflight and a runbook.
 
 ## Install — ten steps
 
@@ -41,7 +42,7 @@ Sources, Devices. Telegram bot for status and alerts. Backups, preflight and a r
 8. **First admin**: `docker exec -it <container> python -m iptvcc.cli create-admin --email … --password '…'`.
    The TOTP secret is printed once.
 9. **Backups**: enable the Coolify database schedule; add an off-server copy.
-10. **Acceptance**: run [`ACCEPTANCE.md`](ACCEPTANCE.md) with a real provider and one TV.
+10. **Acceptance**: run [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) with a real provider and one TV.
 
 ## Verify it is alive
 
@@ -57,7 +58,7 @@ Then log in, create a source, import a playlist, create a device, and open the M
 - Migration applied → stop the app, restore the pre-deploy backup, redeploy the previous image.
 - Wrong env value → fix the variable and redeploy; no data impact.
 
-Details and the risk register: [`DEPLOYMENT.md`](DEPLOYMENT.md).
+Details and the risk register: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## Included, verified
 
@@ -73,6 +74,6 @@ restores · preflight · runbook.
 
 - Client Compatibility Engine, fuzzy match review queue, smart-TV guide cap, category editor in the
   playlist studio, authenticated forum sessions, scheduled re-crawls, provider slot budget, Telegram
-  widgets. Each is listed in [`STATUS.md`](STATUS.md).
+  widgets. Each is listed in [`docs/STATUS.md`](docs/STATUS.md).
 - A deployed instance, a real provider run, a real Telegram delivery, and a CI execution: all three
   need owner actions (credentials, GO, a TV).

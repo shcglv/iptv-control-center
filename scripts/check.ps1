@@ -50,4 +50,6 @@ if (-not $SkipWeb) {
     }
 }
 
+Invoke-Step "documentation consistency" { & ".\.venv\Scripts\python.exe" scripts\check_docs.py }
+
 Write-Host "All gates passed." -ForegroundColor Green
