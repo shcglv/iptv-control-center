@@ -8,6 +8,24 @@
 Every command below was run for this report; nothing is copied from earlier rounds. What is *not*
 verified is listed at the end, and mapped against the specification in [`STATUS.md`](STATUS.md).
 
+## One run of the whole matrix, at one commit
+
+Everything above was assembled across many rounds. On **2026-11-26 at `72f980c`** the entire matrix
+was executed in one sitting, on one checkout, to remove the "each piece passed sometime" caveat:
+
+| What | Result |
+|---|---|
+| `scripts/verify_all.py` (Docker and PostgreSQL available) | **7 passed**, 2 skipped — `decoder` and `smoke` need the internet |
+| `scripts/verify_all.py --only decoder` (internet enabled) | **1 passed** in 44.5 s |
+| Backend, SQLite | **271 passed**, 16 skipped, 221 s |
+| Backend, PostgreSQL 16 | **271 passed**, 16 skipped, 345 s |
+| Browser (Chromium) | **8 passed**, 128 s |
+| Container acceptance, image rebuilt from `72f980c` | **3 passed**, 46 s |
+
+Drill timings from that run: docs 9.0 s, scheduler 16.6 s, Telegram 19.1 s, panel 16.1 s, upgrade
+24.6 s, restore 32.4 s, PostgreSQL container 180.2 s. The `smoke` drill is the only one not executed
+here — it needs a deployed base URL, which does not exist yet.
+
 ## One command for the whole matrix
 
 The drills live in separate scripts because each needs something different. `scripts/verify_all.py`

@@ -104,15 +104,22 @@ def check_test_counts(head: str) -> None:
     depends on the environment; how many exist does not.
     """
     verification = read(ROOT / "docs" / "VERIFICATION.md")
-    # The count appears both in a plain code block and in bold table cells; allow the emphasis.
-    documented = {
-        (int(passed), int(skipped))
-        for passed, skipped in re.findall(
-            r"(\d+)\s+passed\**\s*,?\s*\**\s*(\d+)\s+skipped", verification
-        )
-    }
+    # Only two places state the suite size: the bold Summary cells, and the fenced block under
+    # "## Backend suite". A looser pattern also matched drill tables — "7 passed, 2 skipped" is a
+    # drill count, not a test count — which produced a false failure when such a table was added.
+    documented: set[tuple[int, int]] = set()
+    for line in verification.splitlines():
+        # The backend rows are the only place a test count belongs; drill tables use the same
+        # wording for drill counts ("7 passed, 2 skipped"), which is a different thing.
+        if line.startswith("| Backend"):
+            match = re.search(r"\*\*(\d+) passed\*\*, (\d+) skipped", line)
+            if match is not None:
+                documented.add((int(match.group(1)), int(match.group(2))))
+    block = re.search(r"## Backend suite\s*```[a-z]*\s*(\d+) passed, (\d+) skipped", verification)
+    if block is not None:
+        documented.add((int(block.group(1)), int(block.group(2))))
     if not documented:
-        fail("docs/VERIFICATION.md has no 'N passed, M skipped' line to verify")
+        fail("docs/VERIFICATION.md has no backend 'N passed, M skipped' line to verify")
         return
 
     completed = subprocess.run(
