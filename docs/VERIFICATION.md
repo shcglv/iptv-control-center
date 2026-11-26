@@ -17,8 +17,8 @@ was executed in one sitting, on one checkout, to remove the "each piece passed s
 |---|---|
 | `scripts/verify_all.py` (Docker and PostgreSQL available) | **7 passed**, 2 skipped — `decoder` and `smoke` need the internet |
 | `scripts/verify_all.py --only decoder` (internet enabled) | **1 passed** in 44.5 s |
-| Backend, SQLite | **277 passed**, 16 skipped, 221 s |
-| Backend, PostgreSQL 16 | **277 passed**, 16 skipped, 345 s |
+| Backend, SQLite | **271 passed**, 16 skipped, 221 s |
+| Backend, PostgreSQL 16 | **271 passed**, 16 skipped, 345 s |
 | Browser (Chromium) | **8 passed**, 128 s |
 | Container acceptance, image rebuilt from `72f980c` | **3 passed**, 46 s |
 
@@ -26,17 +26,30 @@ Drill timings from that run: docs 9.0 s, scheduler 16.6 s, Telegram 19.1 s, pane
 24.6 s, restore 32.4 s, PostgreSQL container 180.2 s. The `smoke` drill is the only one not executed
 here — it needs a deployed base URL, which does not exist yet.
 
-## Re-acceptance at 1.7.7
+## Re-acceptance at 1.7.0
 
 The probe-concurrency change touched the health path, so the release gate was re-run rather than
 inherited from the 1.6.6 run:
 
 | Check | Result |
 |---|---|
-| Backend, SQLite | **277 passed**, 16 skipped |
-| Backend, PostgreSQL 16 | **277 passed**, 16 skipped, 281 s |
-| Container acceptance, image built from `v1.7.7` | **3 passed**, 39 s |
+| Backend, SQLite | **272 passed**, 16 skipped |
+| Backend, PostgreSQL 16 | **272 passed**, 16 skipped, 281 s |
+| Container acceptance, image built from `v1.7.0` | **3 passed**, 39 s |
 | Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
+
+## Re-acceptance at `e424a3c` (1.7.7)
+
+The entrypoint gained a database wait loop and the session dependency gained `scope="function"`, so
+the gate ran again on that commit:
+
+| Check | Result |
+|---|---|
+| Backend, SQLite | **277 passed**, 16 skipped, 222 s |
+| Backend, PostgreSQL 16 | **277 passed**, 16 skipped, 311 s |
+| Container acceptance, image built from `e424a3c` (exercises the wait loop) | **3 passed**, 47 s |
+| Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
+| Write-abort drill on a real uvicorn server | **passed** — 200 with the default scope, 500 with `scope="function"` |
 
 ## One command for the whole matrix
 

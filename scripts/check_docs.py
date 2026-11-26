@@ -104,13 +104,14 @@ def check_test_counts(head: str) -> None:
     depends on the environment; how many exist does not.
     """
     verification = read(ROOT / "docs" / "VERIFICATION.md")
-    # Only two places state the suite size: the bold Summary cells, and the fenced block under
-    # "## Backend suite". A looser pattern also matched drill tables — "7 passed, 2 skipped" is a
-    # drill count, not a test count — which produced a false failure when such a table was added.
+    # Only the Summary section states the *current* count. The report also records historical runs
+    # ("271 passed" at an older commit) and drill tables ("7 passed, 2 skipped"); neither is today's
+    # suite size, and comparing them produced false failures.
+    summary = re.search(r"## Summary\s*(.*?)\n## ", verification, re.S)
+    current = summary.group(1) if summary is not None else verification
+
     documented: set[tuple[int, int]] = set()
-    for line in verification.splitlines():
-        # The backend rows are the only place a test count belongs; drill tables use the same
-        # wording for drill counts ("7 passed, 2 skipped"), which is a different thing.
+    for line in current.splitlines():
         if line.startswith("| Backend"):
             match = re.search(r"\*\*(\d+) passed\*\*, (\d+) skipped", line)
             if match is not None:
