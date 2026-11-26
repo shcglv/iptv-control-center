@@ -12,15 +12,15 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 
 | Area | Command | Result |
 |---|---|---|
-| Backend (SQLite) | `pytest -q` | **266 passed**, 13 skipped |
-| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **266 passed**, 13 skipped |
+| Backend (SQLite) | `pytest -q` | **271 passed**, 16 skipped |
+| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **271 passed**, 16 skipped |
 | Backup (PostgreSQL) | `scripts/verify_pg_container.py` | **PASSED** — migrations at start (`ec324056e4de`), import, 302 resolver, restart persistence, 78 KB dump with 28 table entries |
 | Restore (PostgreSQL) | `scripts/verify_restore.py` | **PASSED** — dump restored into a fresh database, row counts match across 28 tables (12 rows), and the application served 2 channels from the restored copy |
 | Upgrade (PostgreSQL) | `scripts/verify_upgrade.py` | **PASSED** — schema at `198a8944b683`, data written through the real import path, upgraded to `head`, rows intact, device playlist still served |
 | Lint | `ruff check src tests scripts` | clean |
 | Types | `mypy src` | clean, 41 files |
 | Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | **8 passed** — including the panel at 390×844 with zero horizontal overflow |
-| Container | `pytest tests/test_container.py` (`IPTV_CONTAINER_TESTS=1`) | **3 passed**, image rebuilt from HEAD |
+| Container | `pytest tests/test_container.py` (`IPTV_CONTAINER_TESTS=1`) | **3 passed**, image rebuilt from 1.6.6 |
 | Real discovery | `pytest tests/test_discovery_live.py` (`IPTV_NETWORK_TESTS=1`) | **2 passed** — a real GitHub page yields an `m3u` link, a real Atom feed parses and correctly yields none |
 | Real public data | `pytest tests/test_real_world.py` (`IPTV_NETWORK_TESTS=1`) | **3 passed** — 1 059-entry public playlist imported to 1 028 channels; 7/12 real streams reachable; 3 channels resolved to real HLS URLs (`HEAD` 200). Details: [`REAL-WORLD.md`](REAL-WORLD.md) |
 | Real EPG + active probe | `data/live_real_epg.py`, ffprobe in the ffmpeg image | 20.9 MiB public guide → 287 channels / 48 814 programmes; ffprobe read a real HLS stream (1280×720 h264) and correctly failed a zero-stream manifest |
@@ -58,7 +58,7 @@ rather than a possibly-stale object. Repeat-accept is a `404` (the suggestion is
 ## Backend suite
 
 ```
-271 passed, 15 skipped
+271 passed, 16 skipped
 ```
 
 Coverage by area: M3U parsing and idempotent import (plus a 17-case provider corpus), matching,
