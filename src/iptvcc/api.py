@@ -92,7 +92,11 @@ from .telegram import TelegramBot, TelegramClient
 
 logger = logging.getLogger(__name__)
 
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+# scope="function" makes the dependency's teardown — and therefore its commit — run before the
+# response is sent, so a failed write aborts the request instead of returning 201 with the write
+# lost. This is FastAPI's documented ordering (0.121+); login additionally commits explicitly so it
+# can answer 503 rather than an abort.
+SessionDep = Annotated[AsyncSession, Depends(get_session, scope="function")]
 
 
 @asynccontextmanager

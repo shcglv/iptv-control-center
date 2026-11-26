@@ -1,7 +1,7 @@
 # Verification report
 
 **Date:** 2026-11-26
-**Version:** 1.7.6 (tagged `v1.7.6`)
+**Version:** 1.7.7 (tagged `v1.7.7`)
 **Environment:** Windows development machine, Python 3.12.0, Docker 29.9.3, Chromium via Playwright
 **Database under test:** SQLite **and PostgreSQL 16** — the full suite passes on both
 
@@ -17,8 +17,8 @@ was executed in one sitting, on one checkout, to remove the "each piece passed s
 |---|---|
 | `scripts/verify_all.py` (Docker and PostgreSQL available) | **7 passed**, 2 skipped — `decoder` and `smoke` need the internet |
 | `scripts/verify_all.py --only decoder` (internet enabled) | **1 passed** in 44.5 s |
-| Backend, SQLite | **276 passed**, 16 skipped, 221 s |
-| Backend, PostgreSQL 16 | **276 passed**, 16 skipped, 345 s |
+| Backend, SQLite | **277 passed**, 16 skipped, 221 s |
+| Backend, PostgreSQL 16 | **277 passed**, 16 skipped, 345 s |
 | Browser (Chromium) | **8 passed**, 128 s |
 | Container acceptance, image rebuilt from `72f980c` | **3 passed**, 46 s |
 
@@ -26,16 +26,16 @@ Drill timings from that run: docs 9.0 s, scheduler 16.6 s, Telegram 19.1 s, pane
 24.6 s, restore 32.4 s, PostgreSQL container 180.2 s. The `smoke` drill is the only one not executed
 here — it needs a deployed base URL, which does not exist yet.
 
-## Re-acceptance at 1.7.6
+## Re-acceptance at 1.7.7
 
 The probe-concurrency change touched the health path, so the release gate was re-run rather than
 inherited from the 1.6.6 run:
 
 | Check | Result |
 |---|---|
-| Backend, SQLite | **276 passed**, 16 skipped |
-| Backend, PostgreSQL 16 | **276 passed**, 16 skipped, 281 s |
-| Container acceptance, image built from `v1.7.6` | **3 passed**, 39 s |
+| Backend, SQLite | **277 passed**, 16 skipped |
+| Backend, PostgreSQL 16 | **277 passed**, 16 skipped, 281 s |
+| Container acceptance, image built from `v1.7.7` | **3 passed**, 39 s |
 | Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
 
 ## One command for the whole matrix
@@ -62,8 +62,8 @@ migrations on the live database) and fails by design in a bare checkout.
 
 | Area | Command | Result |
 |---|---|---|
-| Backend (SQLite) | `pytest -q` | **276 passed**, 16 skipped |
-| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **276 passed**, 16 skipped |
+| Backend (SQLite) | `pytest -q` | **277 passed**, 16 skipped |
+| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **277 passed**, 16 skipped |
 | Backup (PostgreSQL) | `scripts/verify_pg_container.py` | **PASSED** — migrations at start (`ec324056e4de`), import, 302 resolver, restart persistence, 78 KB dump with 28 table entries |
 | Restore (PostgreSQL) | `scripts/verify_restore.py` | **PASSED** — dump restored into a fresh database, row counts match across 28 tables (12 rows), and the application served 2 channels from the restored copy |
 | Upgrade (PostgreSQL) | `scripts/verify_upgrade.py` | **PASSED** — schema at `198a8944b683`, data written through the real import path, upgraded to `head`, rows intact, device playlist still served |
@@ -72,12 +72,12 @@ migrations on the live database) and fails by design in a bare checkout.
 | Lint | `ruff check src tests scripts` | clean |
 | Types | `mypy src` | clean, 41 files |
 | Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | **8 passed** — including the panel at 390×844 with zero horizontal overflow |
-| Container | `pytest tests/test_container.py` (`IPTV_CONTAINER_TESTS=1`) | **3 passed**, image rebuilt from 1.7.6 |
+| Container | `pytest tests/test_container.py` (`IPTV_CONTAINER_TESTS=1`) | **3 passed**, image rebuilt from 1.7.7 |
 | Real discovery | `pytest tests/test_discovery_live.py` (`IPTV_NETWORK_TESTS=1`) | **2 passed** — a real GitHub page yields an `m3u` link, a real Atom feed parses and correctly yields none |
 | Real public data | `pytest tests/test_real_world.py` (`IPTV_NETWORK_TESTS=1`) | **3 passed** — 1 059-entry public playlist imported to 1 028 channels; 7/12 real streams reachable; 3 channels resolved to real HLS URLs (`HEAD` 200). Details: [`REAL-WORLD.md`](REAL-WORLD.md) |
 | Real EPG + active probe | `data/live_real_epg.py`, ffprobe in the ffmpeg image | 20.9 MiB public guide → 287 channels / 48 814 programmes; ffprobe read a real HLS stream (1280×720 h264) and correctly failed a zero-stream manifest |
 | Real decoder through the 302 | `scripts/verify_decoder.py` | **PASSED** — ffmpeg in a container followed our resolver's 302 to a public HLS stream and decoded 3 s (exit 0, no errors) |
-| Panel checks in the container | `scripts/verify_panel.py` | **PASSED** — 8/8 `ok` in a production-shaped container (`app_env=production`, HTTPS base URL), migrations `ec324056e4de`, version 1.7.6 |
+| Panel checks in the container | `scripts/verify_panel.py` | **PASSED** — 8/8 `ok` in a production-shaped container (`app_env=production`, HTTPS base URL), migrations `ec324056e4de`, version 1.7.7 |
 | Restore (SQLite) | `data/live_restore_drill.py` | **PASSED** |
 | Preflight | `scripts/preflight.py` | 8/8 with a valid key; fails correctly without one |
 | Performance | `scripts/bench_scale.py --channels 3000 --sources 10 --epg-channels 100 --programmes 2400` | import 5.58 s (30 000 streams), re-run 3.17 s, render 0.82 s, EPG 37.67 s (240 000 programmes), guide 2.01 s |
@@ -110,7 +110,7 @@ rather than a possibly-stale object. Repeat-accept is a `404` (the suggestion is
 ## Backend suite
 
 ```
-276 passed, 16 skipped
+277 passed, 16 skipped
 ```
 
 Coverage by area: M3U parsing and idempotent import (plus a 17-case provider corpus), matching,

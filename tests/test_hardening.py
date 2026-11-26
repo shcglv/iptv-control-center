@@ -161,3 +161,28 @@ async def test_a_small_body_reaches_the_handler(client: httpx.AsyncClient) -> No
     )
     # Unknown source is a 404 from the handler; the point is that it was not refused as oversized.
     assert response.status_code != 413
+
+
+@pytest.mark.asyncio
+async def test_a_write_that_cannot_be_committed_is_not_reported_as_success(
+    client: httpx.AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Any mutating endpoint, not just login.
+
+    ``SessionDep`` uses ``scope="function"``, so the dependency's commit runs before the response is
+    sent and a failure surfaces as a server error instead of a cheerful 200 with the write lost.
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    async def boom(self: AsyncSession) -> None:
+        raise RuntimeError("disk gone")
+
+    monkeypatch.setattr(AsyncSession, "commit", boom)
+
+    # The request must not come back as 201: with the failure raised before the response is sent,
+    # a real server answers 500, and the in-process transport re-raises instead of lying.
+    with pytest.raises(RuntimeError):
+        await client.post(
+            "/api/v1/profiles", json={"name": "Commit failure"}, headers=ADMIN_HEADERS
+        )

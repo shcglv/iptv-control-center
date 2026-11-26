@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.7] — 2026-11-26
+
+### Changed
+
+- `SessionDep` now uses FastAPI's `scope="function"`, so the session dependency's teardown — and its
+  commit — runs **before** the response is sent instead of after it. A failed write therefore aborts
+  the request rather than returning `201` with the write lost.
+
+### Honest limits of this change
+
+- The behaviour rests on FastAPI's documented ordering (0.121+), not on an observation of mine: the
+  in-process transport used by the tests raises the exception either way, so it cannot distinguish
+  "aborted before the response" from "raised after it". Only the login route is proven end to end —
+  it commits explicitly and answers `503 could not persist the session`.
+- A test now asserts that a mutating endpoint whose commit fails raises rather than returning a
+  success status, which at least keeps the failure from being silently swallowed.
+- `docs/COMPLIANCE.md` states this distinction rather than claiming more.
+
 ## [1.7.6] — 2026-11-26
 
 ### Added

@@ -66,13 +66,15 @@ Run the mechanical check:
 | Smart TVs get a guide they can open | 7→3→1-day windows | `test_epg_cap` |
 | One command reproduces the verification | `verify_all.py` | documented run at `72f980c` |
 
-### Known limitation: writes committed by the dependency
+### Write failures
 
-FastAPI finalises a yield dependency after the response is built, so a commit that fails there
-is logged but not surfaced: the client may receive 200 while the write is lost. Login commits
-explicitly and answers 503; other write endpoints still rely on the dependency. Fixing that fully
-means moving transaction ownership into middleware, which is a wider change than belongs in this
-release.
+`SessionDep` uses FastAPI's `scope="function"`, so the dependency's commit runs **before** the
+response is sent: a failed write aborts the request instead of returning success. That ordering is
+FastAPI's documented behaviour, and the login route is the one path proven end to end — it commits
+explicitly and answers `503 could not persist the session`.
+
+The in-process transport used by the tests raises the exception either way, so it cannot distinguish
+an abort before the response from an exception after it. This document does not claim more than that.
 
 ## Not covered by this table
 

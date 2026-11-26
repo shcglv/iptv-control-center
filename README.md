@@ -4,7 +4,7 @@ Self-hosted control plane for IPTV: sources, a single channel catalog, EPG, qual
 per-device playlists. **Video never transits the server** — playlists point at provider URLs, and the
 server's only role in playback is an optional HTTP 302 that picks the best source at request time.
 
-> **Status: `1.7.6`.** M3U import → channel catalog → playlist profiles (visibility, ordering,
+> **Status: `1.7.7`.** M3U import → channel catalog → playlist profiles (visibility, ordering,
 > drag-and-drop, source pins) → per-device playlist → quality-aware 302 source resolution → XMLTV
 > ingest with channel mapping and per-device guide → discovery with a review queue and a channel
 > identity catalog → duplicate review and merge → Telegram bot → nine-screen React UI with a
