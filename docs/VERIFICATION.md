@@ -15,6 +15,8 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 | Backend (SQLite) | `pytest -q` | **266 passed**, 13 skipped |
 | Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **266 passed**, 13 skipped |
 | Backup (PostgreSQL) | `scripts/verify_pg_container.py` | **PASSED** — migrations at start (`ec324056e4de`), import, 302 resolver, restart persistence, 78 KB dump with 28 table entries |
+| Restore (PostgreSQL) | `scripts/verify_restore.py` | **PASSED** — dump restored into a fresh database, row counts match across 28 tables (12 rows), and the application served 2 channels from the restored copy |
+| Upgrade (PostgreSQL) | `scripts/verify_upgrade.py` | **PASSED** — schema at `198a8944b683`, data written through the real import path, upgraded to `head`, rows intact, device playlist still served |
 | Lint | `ruff check src tests scripts` | clean |
 | Types | `mypy src` | clean, 41 files |
 | Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | **7 passed** |
