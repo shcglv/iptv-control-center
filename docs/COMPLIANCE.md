@@ -66,6 +66,14 @@ Run the mechanical check:
 | Smart TVs get a guide they can open | 7→3→1-day windows | `test_epg_cap` |
 | One command reproduces the verification | `verify_all.py` | documented run at `72f980c` |
 
+### Known limitation: writes committed by the dependency
+
+FastAPI finalises a yield dependency after the response is built, so a commit that fails there
+is logged but not surfaced: the client may receive 200 while the write is lost. Login commits
+explicitly and answers 503; other write endpoints still rely on the dependency. Fixing that fully
+means moving transaction ownership into middleware, which is a wider change than belongs in this
+release.
+
 ## Not covered by this table
 
 Anything that needs a server, a provider or a television: the deployment itself, real provider

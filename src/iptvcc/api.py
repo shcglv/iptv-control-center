@@ -239,6 +239,14 @@ async def login(
     token, csrf = await open_session(
         session, user=user, ip=client_key, user_agent=request.headers.get("user-agent")
     )
+    # Commit here rather than relying on the dependency: a failing commit happens after the response
+    # has been built, so the client would receive 200 with a session that does not exist. A login
+    # that claims success and cannot be used is worse than a clear error.
+    try:
+        await session.commit()
+    except Exception as exc:
+        logger.exception("could not persist the session")
+        raise HTTPException(status_code=503, detail="could not persist the session") from exc
     set_session_cookie(response, token)
     return LoginResponse(
         email=user.email, csrf_token=csrf, expires_in=int(SESSION_TTL.total_seconds())

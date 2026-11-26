@@ -1,4 +1,4 @@
-# Release 1.7.4
+# Release 1.7.5
 
 Verified as an artifact: 271 backend tests on SQLite **and** PostgreSQL 16, the browser suite, the
 container acceptance run, an install drill, an upgrade drill, a backup and a restore drill, a real
@@ -6,7 +6,7 @@ public playlist and guide, a real decoder through the `302`, the panel's own pre
 image, and a security audit with six findings fixed. **It has not been deployed anywhere yet** — that
 is step 10.
 
-- Version: `1.7.4`
+- Version: `1.7.5`
 - Image: one Dockerfile, `python:3.12-slim` base, roughly 370 MB by default
 - Evidence: [`docs/VERIFICATION.md`](docs/VERIFICATION.md) · status:
   [`docs/STATUS.md`](docs/STATUS.md) · security: [`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md)

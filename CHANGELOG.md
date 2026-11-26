@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.5] — 2026-11-26
+
+### Fixed
+
+- **Login could report success without persisting the session.** FastAPI finalises a `yield`
+  dependency after the response has been built, so a commit that fails there is logged and then lost:
+  the client receives `200` and a `csrf_token` for a session row that does not exist. The login route
+  now commits explicitly and answers **503 `could not persist the session`**, with a regression test
+  that overrides the session factory so the commit raises.
+- Found while drilling client-IP forwarding inside a container whose bind mount made SQLite fail:
+  the login returned `200` while the database logged `disk I/O error`.
+
+### Known limitation, written down rather than hidden
+
+Other write endpoints still rely on the dependency's commit, so a commit failure there can return
+`200` while the write is lost (the error is logged with the request id). Fixing that properly means
+moving transaction ownership into middleware — a wider change than belongs at this stage. Login was
+fixed because a false success there is the most misleading; the rest is recorded in
+[`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
+
 ## [1.7.4] — 2026-11-26
 
 ### Fixed

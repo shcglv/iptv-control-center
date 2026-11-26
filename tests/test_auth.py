@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx
 import pyotp
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from iptvcc import passwords, totp
 
@@ -130,3 +131,55 @@ async def test_revoked_session_token_cannot_be_replayed(client: httpx.AsyncClien
     # Put the revoked token back: the server must reject it on its own merits.
     client.cookies.set("iptv_session", token)
     assert (await client.get("/api/v1/auth/me")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_login_reports_failure_when_the_session_cannot_be_saved(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A login that cannot persist its session must not answer 200.
+
+    FastAPI finalises a yield dependency after the response is built, so a failing commit there is
+    invisible to the client. The login route commits explicitly and answers 503 instead.
+    """
+    import pyotp
+
+    from iptvcc.api import app
+    from iptvcc.auth import create_admin_user
+    from iptvcc.db import get_session
+
+    email = "commit-failure@test.local"
+    async with session_factory() as session:
+        await create_admin_user(
+            session, email=email, password=TEST_ADMIN_PASSWORD, totp_secret=TEST_TOTP_SECRET
+        )
+        await session.commit()
+
+    async def broken_session():
+        async with session_factory() as session:
+            real_commit = session.commit
+
+            async def boom() -> None:
+                raise RuntimeError("disk gone")
+
+            session.commit = boom  # type: ignore[method-assign]
+            try:
+                yield session
+            finally:
+                session.commit = real_commit
+
+    app.dependency_overrides[get_session] = broken_session
+    try:
+        response = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": email,
+                "password": TEST_ADMIN_PASSWORD,
+                "totp": pyotp.TOTP(TEST_TOTP_SECRET).now(),
+            },
+        )
+        assert response.status_code == 503, response.text
+        assert "session" in response.text
+    finally:
+        app.dependency_overrides.pop(get_session, None)
