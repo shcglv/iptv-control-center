@@ -67,6 +67,7 @@ migrations on the live database) and fails by design in a bare checkout.
 | Backup (PostgreSQL) | `scripts/verify_pg_container.py` | **PASSED** — migrations at start (`ec324056e4de`), import, 302 resolver, restart persistence, 78 KB dump with 28 table entries |
 | Restore (PostgreSQL) | `scripts/verify_restore.py` | **PASSED** — dump restored into a fresh database, row counts match across 28 tables (12 rows), and the application served 2 channels from the restored copy |
 | Upgrade (PostgreSQL) | `scripts/verify_upgrade.py` | **PASSED** — schema at `198a8944b683`, data written through the real import path, upgraded to `head`, rows intact, device playlist still served |
+| Write abort | `scripts/verify_write_abort.py` | **PASSED** — on a real server a failing dependency returned 200 with the default scope and 500 with `scope="function"`; a profile write whose commit failed returned 500 |
 | Scheduler loop | `scripts/verify_scheduler.py` | **PASSED** — the real application with a 2 s tick recorded 5 ticks in 8 s, with state persisted and no errors logged |
 | Telegram bot | `scripts/verify_telegram.py` | **PASSED** — the real application against a local Bot API stub: long-polled, authorised the owner, answered `/status` with a 137-character status message, then alerted once about a failing source (`🔴 Источник «Drill provider»: drill-failure`) and stayed silent for six more seconds — dedupe held |
 | Lint | `ruff check src tests scripts` | clean |

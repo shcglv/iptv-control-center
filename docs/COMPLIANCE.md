@@ -69,12 +69,17 @@ Run the mechanical check:
 ### Write failures
 
 `SessionDep` uses FastAPI's `scope="function"`, so the dependency's commit runs **before** the
-response is sent: a failed write aborts the request instead of returning success. That ordering is
-FastAPI's documented behaviour, and the login route is the one path proven end to end — it commits
-explicitly and answers `503 could not persist the session`.
+response is sent: a failed write aborts the request instead of returning success. The login route
+additionally commits explicitly and answers `503 could not persist the session`.
 
-The in-process transport used by the tests raises the exception either way, so it cannot distinguish
-an abort before the response from an exception after it. This document does not claim more than that.
+Confirmed on a real uvicorn server by `scripts/verify_write_abort.py`, because the in-process test
+transport re-raises either way and cannot tell the two orderings apart:
+
+```
+[ok] dependency ends after the response           200   ← the failure is swallowed
+[ok] dependency ends before the response          500   ← the request is aborted
+[ok] profile write with a failing commit          500
+```
 
 ## Not covered by this table
 

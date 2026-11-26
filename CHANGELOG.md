@@ -12,15 +12,20 @@ All notable changes to this project are documented here. The format follows
   commit — runs **before** the response is sent instead of after it. A failed write therefore aborts
   the request rather than returning `201` with the write lost.
 
-### Honest limits of this change
+### Verified, after initially not being
 
-- The behaviour rests on FastAPI's documented ordering (0.121+), not on an observation of mine: the
-  in-process transport used by the tests raises the exception either way, so it cannot distinguish
-  "aborted before the response" from "raised after it". Only the login route is proven end to end —
-  it commits explicitly and answers `503 could not persist the session`.
-- A test now asserts that a mutating endpoint whose commit fails raises rather than returning a
-  success status, which at least keeps the failure from being silently swallowed.
-- `docs/COMPLIANCE.md` states this distinction rather than claiming more.
+The ordering is FastAPI's documented behaviour, and it was later confirmed on a real uvicorn server
+(`scripts/verify_write_abort.py`), because the in-process test transport re-raises either way and
+cannot tell the two apart:
+
+```
+[ok] dependency ends after the response           HTTP 200   ← the failure is swallowed
+[ok] dependency ends before the response          HTTP 500   ← the request is aborted
+[ok] profile write with a failing commit          HTTP 500
+```
+
+So a write that cannot be committed now reaches the client as a server error rather than a success.
+The login route is still the one path that answers `503 could not persist the session` explicitly.
 
 ## [1.7.6] — 2026-11-26
 

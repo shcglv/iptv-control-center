@@ -38,6 +38,7 @@ DRILLS: list[Drill] = [
     Drill("spec", "scripts/check_spec.py"),
     Drill("scheduler", "scripts/verify_scheduler.py"),
     Drill("telegram", "scripts/verify_telegram.py"),
+    Drill("write-abort", "scripts/verify_write_abort.py"),
     Drill("panel", "scripts/verify_panel.py", needs=frozenset({"docker"})),
     Drill("decoder", "scripts/verify_decoder.py", needs=frozenset({"docker", "network"})),
     Drill("upgrade", "scripts/verify_upgrade.py", needs=frozenset({"docker"})),
