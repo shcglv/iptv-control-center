@@ -251,3 +251,27 @@ async def test_scheduler_api_reports_and_ticks(client: httpx.AsyncClient) -> Non
     after = (await client.get("/api/v1/scheduler/status", headers=ADMIN_HEADERS)).json()
     assert after["healthy"] is True
     assert after["rounds"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_stopping_the_scheduler_releases_the_lease(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A redeploy must not wait for the lease to expire before probing resumes."""
+    from iptvcc.services.scheduler import ProbeScheduler, acquire_lease, get_state
+
+    async with session_factory() as session:
+        first = ProbeScheduler(session_factory)
+        assert await acquire_lease(session, first.owner, 180) is True
+        await session.commit()
+
+    # Stopping hands the lease back, so a replacement wins immediately.
+    await first.stop()
+
+    async with session_factory() as session:
+        state = await get_state(session)
+        assert state.owner is None
+        second = ProbeScheduler(session_factory)
+        assert await acquire_lease(session, second.owner, 180) is True
+        await session.commit()
+        await second.stop()

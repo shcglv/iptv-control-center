@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] — 2026-11-26
+
+### Fixed
+
+- **A redeploy paused probing for three minutes.** Shutdown stopped the scheduler but left its
+  database lease behind, so the replacement instance saw a live lease and refused to probe until the
+  180-second TTL expired. Measured before the fix: after a clean `docker stop`, the lease still had
+  152 seconds to run.
+- `ProbeScheduler.stop()` now releases the lease if it still owns it. Measured after the fix, in the
+  container: `owner=None, locked_until=0`, and a test acquires the lease immediately afterwards.
+
 ## [1.7.1] — 2026-11-26
 
 ### Fixed

@@ -73,6 +73,15 @@ async def acquire_lease(session: AsyncSession, owner: str, ttl_seconds: int) -> 
     return bool(result.rowcount)
 
 
+async def release_lease(session: AsyncSession, owner: str) -> None:
+    """Give the lease back if we still hold it, so a replacement can start probing immediately."""
+    await session.execute(
+        update(SchedulerState)
+        .where(SchedulerState.owner == owner)
+        .values(owner=None, locked_until=0)
+    )
+    await session.commit()
+
 async def due_stream_ids(
     session: AsyncSession, *, batch_size: int, hot_seconds: int, cold_seconds: int
 ) -> list[int]:
@@ -146,6 +155,14 @@ class ProbeScheduler:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._task
             self._task = None
+        # Hand the lease back instead of letting it expire. Without this, a redeploy leaves the
+        # replacement instance unable to probe for the full TTL — 180 seconds of silence after
+        # every deploy, which looks like a broken scheduler.
+        try:
+            async with self._factory() as session:
+                await release_lease(session, self.owner)
+        except Exception:
+            logger.warning("could not release the scheduler lease on shutdown", exc_info=True)
 
     async def run_forever(self) -> None:
         logger.info("probe scheduler started (owner=%s, tick=%ss)", self.owner, self._tick)
