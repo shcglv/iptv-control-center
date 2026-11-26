@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — 2026-11-26
+
+### Security
+
+- **The API schema is no longer public in production.** `/docs`, `/redoc` and `/openapi.json` were
+  served to anyone who asked; they now exist only outside production, and `IPTV_ENABLE_DOCS=true`
+  overrides that when a schema is genuinely needed. The SPA fallback returns `404` for those paths
+  instead of answering with `index.html`, so a scanner sees "not served" rather than a misleading
+  `200`.
+- Verified in the production-shaped container: `/docs`, `/redoc` and `/openapi.json` all return 404
+  while development keeps them, via `scripts/verify_panel.py`.
+
 ## [1.5.1] — 2026-11-26
 
 ### Security

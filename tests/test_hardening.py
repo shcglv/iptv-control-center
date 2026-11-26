@@ -117,3 +117,23 @@ async def test_hsts_only_when_the_base_url_is_https(
     )
     secure = await anon_client.get("/healthz")
     assert secure.headers["strict-transport-security"].startswith("max-age=31536000")
+
+
+# --- api documentation exposure ----------------------------------------------------------------
+
+
+def test_docs_follow_the_environment() -> None:
+    from iptvcc.config import Settings
+
+    assert Settings(app_env="development").docs_enabled is True
+    assert Settings(app_env="production").docs_enabled is False
+    assert Settings(app_env="prod").docs_enabled is False
+    assert Settings(app_env="production", enable_docs=True).docs_enabled is True
+    assert Settings(app_env="development", enable_docs=False).docs_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_docs_are_served_outside_production(anon_client: httpx.AsyncClient) -> None:
+    # The test app runs with app_env=test, so the schema is available for developers.
+    assert (await anon_client.get("/docs")).status_code == 200
+    assert (await anon_client.get("/openapi.json")).status_code == 200

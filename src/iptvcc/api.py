@@ -160,6 +160,9 @@ app = FastAPI(
     version=__version__,
     summary="Control plane for IPTV: catalog, playlists, source resolution. No media bytes.",
     lifespan=lifespan,
+    docs_url="/docs" if get_settings().docs_enabled else None,
+    redoc_url="/redoc" if get_settings().docs_enabled else None,
+    openapi_url="/openapi.json" if get_settings().docs_enabled else None,
 )
 configure_logging()
 app.add_middleware(RequestContextMiddleware)
@@ -1994,6 +1997,10 @@ async def _resolve_profile(session: AsyncSession, profile_id: int | None) -> Pla
 async def frontend_or_info(full_path: str) -> Response:
     """Serve the built SPA, falling back to an API description when no build is present."""
     if full_path.startswith(("api/", "p/")) or full_path == "healthz":
+        raise HTTPException(status_code=404, detail="not found")
+    # With documentation disabled these paths have no route; the SPA fallback must not pretend they
+    # exist, or a scanner sees "200" where the answer is "this is not served".
+    if full_path in {"docs", "redoc", "openapi.json"} and not get_settings().docs_enabled:
         raise HTTPException(status_code=404, detail="not found")
 
     index = STATIC_DIR / "index.html"

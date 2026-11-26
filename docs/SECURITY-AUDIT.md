@@ -39,6 +39,17 @@ reviewed rather than suppressed wholesale:
 | B404 — `import subprocess` (two modules) | Accepted project-wide in `[tool.bandit].skips`: both call sites are the previous row and ffprobe. |
 | B105 — "hardcoded password" | False positive: it matched the `ipt_` token **prefix** constant. Skipped in config. |
 
+## Second finding: the schema was public in production
+
+`scripts/smoke_public.py` and a manual probe of a production-configured instance showed `/docs`,
+`/redoc` and `/openapi.json` answering `200` to unauthenticated callers. Not a vulnerability in
+itself — every endpoint behind them requires a session — but it publishes the full API surface,
+parameter names and models to anyone scanning the host.
+
+Fixed: the routes exist only outside production, `IPTV_ENABLE_DOCS` overrides the default, and the
+SPA fallback answers `404` for those paths instead of serving `index.html`. Verified inside the
+production-shaped container by `scripts/verify_panel.py` (three `404` rows).
+
 ## What this does not prove
 
 - **Container OS packages** are not scanned. A production image should also be scanned (Trivy or

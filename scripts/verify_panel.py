@@ -122,6 +122,13 @@ def main() -> int:
         warnings = [row for row in checks if row["status"] == "warn"]
         migrations = next(row for row in checks if row["name"] == "migrations")
 
+        # In production the interactive API documentation must not be reachable.
+        for path in ("/docs", "/redoc", "/openapi.json"):
+            status = client.get(path, follow_redirects=False).status_code
+            print(f"  [{('ok' if status == 404 else 'fail'):<4}] {path:<16} {status}")
+            if status != 404:
+                failures.append({"name": path, "status": "fail", "detail": str(status)})
+
         if info["migrations"] is None:
             print("RESULT: FAILED - no applied migration reported")
             return 4

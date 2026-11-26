@@ -60,9 +60,19 @@ class Settings(BaseSettings):
     telegram_notify_interval_seconds: int = 300
     telegram_dedupe_hours: int = 6
 
+    # Interactive API documentation. Left unset it follows the environment: on in development, off
+    # in production, where the schema is not something an unauthenticated visitor should read.
+    enable_docs: bool | None = None
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() in {"production", "prod"}
+
+    @property
+    def docs_enabled(self) -> bool:
+        if self.enable_docs is not None:
+            return self.enable_docs
+        return not self.is_production
 
 
 @lru_cache(maxsize=1)
