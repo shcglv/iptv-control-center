@@ -43,10 +43,36 @@ device playlist: 1028 channels, 276 KiB
 RESULT: REAL-WORLD CHECK COMPLETE (3 live resolutions)
 ```
 
-## A player was attempted, and failed to be automated
+## A real decoder consumed the delivery chain
 
-VLC 3.x is installed on the development machine, so the obvious next step was to play our playlist
-through a real player. It could not be driven headlessly:
+VLC could not be driven headlessly (see below), but **ffmpeg is the demuxer and decoder underneath
+most players**, and it is scriptable. `scripts/verify_decoder.py` runs the whole chain inside Docker,
+so no host firewall is involved:
+
+```
+ffmpeg (container) → /p/<token>/s/<key>.m3u8 → 302 → provider HLS → decoded frames
+```
+
+```
+resolver: http://iptv-decode-app:8000/p/ipt_…/s/bk9cwv35cy2j.m3u8
+host-side resolver status: 302 https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+decoding through the resolver with ffmpeg
+ffmpeg exit: 0
+server saw 2 resolver redirect(s)
+RESULT: DECODER CHECK PASSED (ffmpeg decoded through our 302)
+```
+
+`ffmpeg -i <our resolver URL> -t 3 -f null -` exited **0** with no error output, and the server log
+confirms the redirect it followed. This is the closest thing to a player that can be automated here:
+a real media stack resolved our token, followed our 302 and decoded the provider's stream.
+
+It still is not VLC or OwnTV — container quirks and player-specific header behaviour remain
+unproven, and `ACCEPTANCE.md` on a real television stays the final word.
+
+## The player attempt that failed
+
+VLC 3.x is installed on the development machine, so the obvious step was to play our playlist
+through it. It could not be driven headlessly:
 
 - `vlc --intf dummy --vout dummy --aout dummy --play-and-exit --run-time 5 <url>` returns
   `0xC0000005` (access violation) on exit, so the exit code says nothing about playback.
@@ -57,10 +83,7 @@ through a real player. It could not be driven headlessly:
 Two server-side hypotheses were eliminated: VLC's single-instance mode (`--no-one-instance`) and
 Python stdout buffering in the server child (`PYTHONUNBUFFERED=1`). Neither changed the result.
 
-**Conclusion:** player-level verification is not automatable in this environment, and this document
-does not claim it. `ACCEPTANCE.md` on a real television remains the only way to prove a player
-decodes what we serve. The attempt is recorded because "we tried and it did not work" is more useful
-to the next person than silence.
+Recorded because "we tried and it did not work" is more useful to the next person than silence.
 
 ## What this proves
 

@@ -21,6 +21,7 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 | Container | `pytest tests/test_container.py` (`IPTV_CONTAINER_TESTS=1`) | **3 passed**, image rebuilt from HEAD |
 | Real public data | `pytest tests/test_real_world.py` (`IPTV_NETWORK_TESTS=1`) | **3 passed** — 1 059-entry public playlist imported to 1 028 channels; 7/12 real streams reachable; 3 channels resolved to real HLS URLs (`HEAD` 200). Details: [`REAL-WORLD.md`](REAL-WORLD.md) |
 | Real EPG + active probe | `data/live_real_epg.py`, ffprobe in the ffmpeg image | 20.9 MiB public guide → 287 channels / 48 814 programmes; ffprobe read a real HLS stream (1280×720 h264) and correctly failed a zero-stream manifest |
+| Real decoder through the 302 | `scripts/verify_decoder.py` | **PASSED** — ffmpeg in a container followed our resolver's 302 to a public HLS stream and decoded 3 s (exit 0, no errors) |
 | Restore (SQLite) | `data/live_restore_drill.py` | **PASSED** |
 | Preflight | `scripts/preflight.py` | 8/8 with a valid key; fails correctly without one |
 | Performance | `scripts/bench_scale.py --channels 3000 ...` | import 1.78 s, render 0.34 s, EPG 12.4 s, guide 4.5 s |

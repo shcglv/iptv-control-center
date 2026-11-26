@@ -10,6 +10,7 @@ Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 
 | Requirement | Status | Evidence |
 |---|---|---|
+| Real decoder through the 302 | ✅ | `scripts/verify_decoder.py`: ffmpeg in a container fetched our resolver URL, followed the 302 and decoded 3 s with exit 0; VLC could not be automated headlessly (`REAL-WORLD.md`) |
 | **Direct streaming** — the server never carries video | ✅ | 302 resolver returns `Location: <provider URL>`; container test asserts the redirect target; **3 channels resolved to real public HLS endpoints, `HEAD` 200** (`REAL-WORLD.md`) |
 | Pure-Direct alternative (playlist emits provider URLs) | ❌ not implemented | Profile flag exists in the plan, not in code |
 | M3U import, tolerant parser, idempotent re-import | ✅ | 17-test provider corpus + import tests; **real public playlist**: 1 059 entries → 1 028 channels in 0.6 s (`REAL-WORLD.md`) |
