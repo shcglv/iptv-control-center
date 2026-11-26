@@ -18,6 +18,7 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 | Restore (PostgreSQL) | `scripts/verify_restore.py` | **PASSED** — dump restored into a fresh database, row counts match across 28 tables (12 rows), and the application served 2 channels from the restored copy |
 | Upgrade (PostgreSQL) | `scripts/verify_upgrade.py` | **PASSED** — schema at `198a8944b683`, data written through the real import path, upgraded to `head`, rows intact, device playlist still served |
 | Scheduler loop | `scripts/verify_scheduler.py` | **PASSED** — the real application with a 2 s tick recorded 5 ticks in 8 s, with state persisted and no errors logged |
+| Telegram bot | `scripts/verify_telegram.py` | **PASSED** — the real application against a local Bot API stub: long-polled, authorised the owner, answered `/status` with a 137-character status message |
 | Lint | `ruff check src tests scripts` | clean |
 | Types | `mypy src` | clean, 41 files |
 | Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | **8 passed** — including the panel at 390×844 with zero horizontal overflow |
