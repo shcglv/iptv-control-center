@@ -21,6 +21,7 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 | Types | `mypy src` | clean, 41 files |
 | Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | **7 passed** |
 | Container | `pytest tests/test_container.py` (`IPTV_CONTAINER_TESTS=1`) | **3 passed**, image rebuilt from HEAD |
+| Real discovery | `pytest tests/test_discovery_live.py` (`IPTV_NETWORK_TESTS=1`) | **2 passed** — a real GitHub page yields an `m3u` link, a real Atom feed parses and correctly yields none |
 | Real public data | `pytest tests/test_real_world.py` (`IPTV_NETWORK_TESTS=1`) | **3 passed** — 1 059-entry public playlist imported to 1 028 channels; 7/12 real streams reachable; 3 channels resolved to real HLS URLs (`HEAD` 200). Details: [`REAL-WORLD.md`](REAL-WORLD.md) |
 | Real EPG + active probe | `data/live_real_epg.py`, ffprobe in the ffmpeg image | 20.9 MiB public guide → 287 channels / 48 814 programmes; ffprobe read a real HLS stream (1280×720 h264) and correctly failed a zero-stream manifest |
 | Real decoder through the 302 | `scripts/verify_decoder.py` | **PASSED** — ffmpeg in a container followed our resolver's 302 to a public HLS stream and decoded 3 s (exit 0, no errors) |
@@ -57,7 +58,7 @@ rather than a possibly-stale object. Repeat-accept is a `404` (the suggestion is
 ## Backend suite
 
 ```
-271 passed, 13 skipped
+271 passed, 15 skipped
 ```
 
 Coverage by area: M3U parsing and idempotent import (plus a 17-case provider corpus), matching,

@@ -85,6 +85,25 @@ Python stdout buffering in the server child (`PYTHONUNBUFFERED=1`). Neither chan
 
 Recorded because "we tried and it did not work" is more useful to the next person than silence.
 
+## Discovery against live pages
+
+The discovery suite used hand-written fixtures. `tests/test_discovery_live.py` (opt-in) runs the
+adapters against real markup:
+
+```
+https://github.com/iptv-org/iptv               275 KiB  items=1  m3u
+https://iptv-org.github.io/                    11 KiB  items=0
+https://github.com/iptv-org/iptv/releases.atom 502 B   feed items=0
+```
+
+The repository page yields a real `m3u` link, so the HTML extractor copes with GitHub's markup. The
+Atom feed parses without error and returns **zero** items — correct, because release entries are not
+playlists. The landing page yields nothing, which is also correct: it is JavaScript-rendered and
+carries no playlist links in its HTML.
+
+That last line is worth stating plainly: an empty result is not automatically a bug, and a discovery
+adapter that invented items from a page without playlists would be worse than one that finds none.
+
 ## What this proves
 
 - **A real-world playlist parses.** 1 059 entries became 1 028 channels and 1 057 streams across 27
