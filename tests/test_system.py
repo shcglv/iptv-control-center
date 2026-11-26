@@ -60,14 +60,38 @@ async def test_system_check_passes_when_the_schema_is_current(
 
 
 @pytest.mark.asyncio
-async def test_system_check_fails_on_an_unmigrated_database(
-    client: httpx.AsyncClient,
+async def test_system_check_fails_when_no_migration_is_recorded(
+    client: httpx.AsyncClient, session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
-    # No alembic_version row in a fresh test schema: the panel must say so, not pretend.
-    response = await client.get("/api/v1/system/check", headers=ADMIN_HEADERS)
-    checks = {row["name"]: row for row in response.json()}
-    assert checks["migrations"]["status"] == "fail"
-    assert checks["database"]["status"] == "ok"
+    """The verdict must follow the database, whatever schema the test harness built.
+
+    SQLite tests create the schema with ``create_all`` and have no ``alembic_version``; the
+    PostgreSQL harness runs the real migrations. Either way, removing the recorded revision must
+    turn the check into a failure, and putting it back must not leave the suite dirty.
+    """
+    recorded: str | None = None
+    async with session_factory() as session:
+        try:
+            recorded = await session.scalar(text("SELECT version_num FROM alembic_version"))
+            await session.execute(text("DELETE FROM alembic_version"))
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            recorded = None
+
+    try:
+        response = await client.get("/api/v1/system/check", headers=ADMIN_HEADERS)
+        checks = {row["name"]: row for row in response.json()}
+        assert checks["migrations"]["status"] == "fail"
+        assert checks["database"]["status"] == "ok"
+    finally:
+        if recorded:
+            async with session_factory() as session:
+                await session.execute(text("DELETE FROM alembic_version"))
+                await session.execute(
+                    text("INSERT INTO alembic_version (version_num) VALUES (:v)"), {"v": recorded}
+                )
+                await session.commit()
 
 
 @pytest.mark.asyncio

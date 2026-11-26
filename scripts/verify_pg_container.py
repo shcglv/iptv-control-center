@@ -78,6 +78,11 @@ def main() -> int:
         print(built.stderr[-2500:])
         return 2
 
+    # The drill needs its own network and the database on it. Both are recreated rather than
+    # assumed: after a cleanup, a missing network used to fail with "network iptv-test not found".
+    docker("network", "create", NETWORK)
+    docker("network", "connect", NETWORK, PG)
+
     print("waiting for postgres")
     for _ in range(60):
         ready = docker("exec", PG, "pg_isready", "-U", "postgres")

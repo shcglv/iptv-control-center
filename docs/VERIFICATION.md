@@ -12,8 +12,8 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 
 | Area | Command | Result |
 |---|---|---|
-| Backend (SQLite) | `pytest -q` | **251 passed**, 13 skipped |
-| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **251 passed**, 13 skipped |
+| Backend (SQLite) | `pytest -q` | **266 passed**, 13 skipped |
+| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **266 passed**, 13 skipped |
 | Backup (PostgreSQL) | `scripts/verify_pg_container.py` | **PASSED** — migrations at start (`ec324056e4de`), import, 302 resolver, restart persistence, 78 KB dump with 28 table entries |
 | Lint | `ruff check src tests scripts` | clean |
 | Types | `mypy src` | clean, 41 files |
@@ -27,6 +27,22 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 | Preflight | `scripts/preflight.py` | 8/8 with a valid key; fails correctly without one |
 | Performance | `scripts/bench_scale.py --channels 3000 ...` | import 1.78 s, render 0.34 s, EPG 12.4 s, guide 4.5 s |
 
+### Two test-side defects found during this sweep
+
+Both were in the verification harness rather than the product, and both are fixed:
+
+- `test_system_check_fails_on_an_unmigrated_database` assumed SQLite's schema (`create_all`, no
+  `alembic_version`). The PostgreSQL harness runs the real migrations, so the check was legitimately
+  `ok` and the test failed there. It now removes the recorded revision itself, asserts the failure,
+  and restores it, which is deterministic on both databases.
+- `scripts/verify_pg_container.py` assumed its Docker network still existed and failed with
+  `network iptv-test not found` after a cleanup. It now creates the network and connects the
+  database container itself.
+
+One browser run failed while Docker Desktop was starting (378 s for the suite, versus 88 s when
+idle); the failing test passed alone and the full suite passed on an idle machine. Recorded because
+timing flakes and real failures look identical in a log.
+
 ### A PostgreSQL-only defect found by this sweep
 
 The duplicate-merge path passed all 251 SQLite tests and failed three tests on PostgreSQL with
@@ -39,7 +55,7 @@ rather than a possibly-stale object. Repeat-accept is a `404` (the suggestion is
 ## Backend suite
 
 ```
-251 passed, 13 skipped
+266 passed, 13 skipped
 ```
 
 Coverage by area: M3U parsing and idempotent import (plus a 17-case provider corpus), matching,
