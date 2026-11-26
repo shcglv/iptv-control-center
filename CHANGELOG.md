@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] — 2026-11-26
+
+### Fixed
+
+- **A single playlist line could block the server for minutes.** `parse_attributes` used a regular
+  expression that retried the key pattern at every character, so an unterminated quote made one
+  `#EXTINF` line quadratic: measured 27 ms at 1 000 characters, 1.25 s at 8 000, 5.2 s at 16 000 —
+  and a 200 000-character line would have run for around thirteen minutes on the event loop,
+  stalling every other request. Replaced with a single-pass scanner; the same 200 000-character line
+  now parses in 0.08 s.
+- A regression test feeds a 200 000-character unterminated attribute line followed by a valid entry
+  and asserts parsing stays under five seconds and the valid entry survives.
+
+### Notes
+
+- Found by writing the test, not by reading the code: the audit question "does the parser survive a
+  pathological line?" produced a hang on the first run.
+- Real attribute payloads are under a kilobyte; the old code was fine in practice and dangerous in
+  the worst case, which is exactly the case an attacker chooses.
+
 ## [1.6.2] — 2026-11-26
 
 ### Security

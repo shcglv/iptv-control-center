@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from iptvcc.m3u import (
     CONTAINER_HLS,
     CONTAINER_TS,
@@ -123,3 +125,28 @@ def test_render_m3u_empty_catalog() -> None:
     out = render_m3u([], base_url="http://base", token="tok")
     assert out.endswith("\n")
     assert out.count("\n") == 1
+
+
+@pytest.mark.asyncio
+async def test_a_pathological_extinf_line_is_parsed_without_blowing_up() -> None:
+    """A hostile playlist line must stay linear: no regex backtracking, no runaway memory."""
+    import time
+
+    from iptvcc.m3u import iter_entries
+
+    # 200 000 characters of attributes with no closing quote, then a valid entry.
+    hostile = (
+        "#EXTM3U\n"
+        '#EXTINF:-1 tvg-id="' + "a" * 200_000 + "\n"
+        "http://p.test/broken.ts\n"
+        '#EXTINF:-1 tvg-id="ok",Healthy\n'
+        "http://p.test/ok.ts\n"
+    )
+    started = time.perf_counter()
+    parsed = list(iter_entries(hostile.splitlines()))
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 5.0, f"parsing took {elapsed:.1f}s"
+    assert any(entry.name == "Healthy" for entry in parsed), "valid entry lost"
+    assert all(len(entry.name) < 500 for entry in parsed)
+    assert all(len(entry.url) < 2_000 for entry in parsed)

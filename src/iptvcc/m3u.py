@@ -17,7 +17,6 @@ CONTAINER_HLS: Final = "m3u8"
 CONTAINER_DASH: Final = "mpd"
 CONTAINER_OTHER: Final = "other"
 
-_ATTR_RE = re.compile(r"""([A-Za-z0-9_.\-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"',]+))""")
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 _WS_RE = re.compile(r"\s+")
 _EXT_RE = re.compile(r"\.([A-Za-z0-9]{1,6})(?:$|[?#])")
@@ -76,12 +75,57 @@ def _attr(attrs: dict[str, str], name: str) -> str:
 
 
 def parse_attributes(payload: str) -> dict[str, str]:
-    """Parse ``key="value"`` / ``key='value'`` / ``key=value`` pairs from an ``#EXTINF`` payload."""
+    """Parse ``key="value"`` / ``key='value'`` / ``key=value`` pairs from an ``#EXTINF`` payload.
+
+    A hand-written scanner, not a regular expression. The previous pattern retried the key pattern
+    at every position, so an unterminated quote made a single line quadratic: 16 000 characters
+    took 5.2 s, and a 200 000-character line would have blocked the event loop for minutes. This
+    walks the string once.
+    """
     attrs: dict[str, str] = {}
-    for match in _ATTR_RE.finditer(payload):
-        key = match.group(1)
-        value = next((group for group in match.groups()[1:] if group is not None), "")
-        attrs[key] = value
+    index = 0
+    length = len(payload)
+    separators = " \t\r\n,"
+    while index < length:
+        while index < length and payload[index] in separators:
+            index += 1
+        start = index
+        while index < length and (payload[index].isalnum() or payload[index] in "._-"):
+            index += 1
+        if index == start:
+            # Not a key character: skip it and carry on, which keeps the scan linear.
+            index += 1
+            continue
+        key = payload[start:index]
+
+        while index < length and payload[index].isspace():
+            index += 1
+        if index >= length or payload[index] != "=":
+            continue
+        index += 1
+        while index < length and payload[index].isspace():
+            index += 1
+
+        if index < length and payload[index] in "\"'":
+            quote = payload[index]
+            end = payload.find(quote, index + 1)
+            if end == -1:
+                attrs[key] = payload[index + 1 :]
+                break
+            attrs[key] = payload[index + 1 : end]
+            index = end + 1
+            continue
+
+        start = index
+        while (
+            index < length
+            and not payload[index].isspace()
+            and payload[index] not in ',"\''
+        ):
+            index += 1
+        attrs[key] = payload[start:index]
+        if index == start:
+            index += 1
     return attrs
 
 

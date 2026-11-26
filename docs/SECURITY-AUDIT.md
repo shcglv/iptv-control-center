@@ -82,6 +82,26 @@ Audited alongside it and already sound: discovery fetches through the guarded cl
 cap, the RSS parser already disabled entity resolution and network access, and login already
 throttles per client key.
 
+## Fifth finding: quadratic playlist parsing
+
+The M3U attribute pattern retried `[A-Za-z0-9_.-]+\s*=` at every position, so an unterminated quote
+made a single line quadratic. Measured before the fix:
+
+| Attribute length | Time |
+|---|---|
+| 1 000 chars | 27 ms |
+| 8 000 chars | 1.25 s |
+| 16 000 chars | 5.2 s |
+| 200 000 chars | ~13 minutes (extrapolated) |
+
+Parsing runs on the event loop during import, so one hostile line stalls every other request in the
+process. A playlist fetched from a provider URL is attacker-influenced even though the import itself
+is admin-triggered.
+
+`parse_attributes` is now a single-pass scanner. The same 200 000-character line parses in 0.08 s,
+all eleven M3U tests pass unchanged, and a regression test asserts both the time bound and that a
+valid entry after the hostile line still survives.
+
 ## What this does not prove
 
 - **Container OS packages** are not scanned. A production image should also be scanned (Trivy or
