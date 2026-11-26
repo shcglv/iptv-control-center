@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] — 2026-11-26
+
+### Security
+
+- **XML entity expansion is refused instead of trusted to a heuristic.** XMLTV parsing allowed a
+  DOCTYPE (real exports carry one) while leaving libxml2's entity resolution on, so a
+  "billion laughs" guide depended on libxml2's amplification limit rather than being impossible.
+  Resolution is now off, and the amplification refusal is wrapped into the service's own `XmltvError`
+  so a hostile upload answers `422` instead of a `500` with a traceback.
+- Verified by a regression test with a six-level entity bomb: it is rejected in milliseconds, while
+  the same document expanded to hundreds of thousands of characters with resolution enabled.
+
 ## [1.6.0] — 2026-11-26
 
 ### Security

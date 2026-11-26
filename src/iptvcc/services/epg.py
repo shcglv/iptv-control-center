@@ -162,13 +162,29 @@ def iter_xmltv(data: bytes | str, default_tz: str) -> Iterator[tuple[str, dict[s
     if isinstance(data, str):
         data = _normalise_text_document(data)
     _guard_document(data)
-    # DOCTYPE is common in XMLTV exports, so it is allowed. Entity expansion limits come from
-    # libxml2 (huge_tree=False) and no_network=True, so a DTD is never fetched and a "billion
-    # laughs" document hits the amplification limit instead of the database.
+    # DOCTYPE is common in XMLTV exports, so it is allowed, but entity *resolution* is not: libxml2
+    # would otherwise expand internal entities, and "billion laughs" would then depend on its
+    # amplification heuristic rather than on this being impossible. A guide that defines entities is
+    # pathological — real exports use only the five predefined ones, which libxml2 always resolves.
+    # huge_tree=False bounds depth and size; no_network=True means a DTD is never fetched.
     context = etree.iterparse(
-        BytesIO(data), events=("end",), huge_tree=False, no_network=True, recover=False
+        BytesIO(data),
+        events=("end",),
+        huge_tree=False,
+        no_network=True,
+        resolve_entities=False,
+        recover=False,
     )
-    for _event, element in context:
+    # libxml2 raises while iterating, not only when the parser is built — an entity-amplification
+    # refusal surfaces on the first read. Without this wrapper a hostile guide becomes a 500 instead
+    # of a clear "invalid XMLTV" answer.
+    while True:
+        try:
+            _event, element = next(context)
+        except StopIteration:
+            break
+        except etree.XMLSyntaxError as exc:
+            raise XmltvError(f"invalid XML: {str(exc).splitlines()[0][:200]}") from exc
         tag = etree.QName(element).localname
         if tag == "channel":
             channel_id = element.get("id")

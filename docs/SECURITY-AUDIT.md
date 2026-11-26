@@ -50,6 +50,24 @@ Fixed: the routes exist only outside production, `IPTV_ENABLE_DOCS` overrides th
 SPA fallback answers `404` for those paths instead of serving `index.html`. Verified inside the
 production-shaped container by `scripts/verify_panel.py` (three `404` rows).
 
+## Third finding: XMLTV entity expansion
+
+Provider guides are external XML. The parser allowed a DOCTYPE — real exports carry one — and left
+`resolve_entities` at its default, which is *on*. A malicious guide could therefore define nested
+entities and rely on libxml2's amplification heuristic to stop it, rather than the product making
+expansion structurally impossible.
+
+Two changes:
+
+- `resolve_entities=False` in the iterparse call. The predefined XML entities still resolve, so
+  ordinary guides are unaffected: the 19-case corpus and every EPG test passed unchanged.
+- An `XMLSyntaxError` raised **during iteration** — which is where libxml2 reports the amplification
+  refusal — is now wrapped into `XmltvError`, so a hostile upload returns `422` instead of a `500`
+  with a traceback.
+
+Measured on a six-level bomb: 6 characters and a clean refusal with resolution off, versus 3000
+characters at four levels (10⁶ at six) with it on.
+
 ## What this does not prove
 
 - **Container OS packages** are not scanned. A production image should also be scanned (Trivy or

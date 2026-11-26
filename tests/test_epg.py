@@ -270,3 +270,29 @@ async def test_device_guide_endpoint_joins_with_playlist(client: httpx.AsyncClie
 @pytest.mark.asyncio
 async def test_device_guide_rejects_unknown_token(anon_client: httpx.AsyncClient) -> None:
     assert (await anon_client.get("/p/ipt_nope/epg.xml")).status_code == 404
+
+
+BILLION_LAUGHS = b"""<?xml version="1.0"?>
+<!DOCTYPE tv [
+<!ENTITY lol "lol">
+<!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+<!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+<!ENTITY lol4 "&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;">
+<!ENTITY lol5 "&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;">
+<!ENTITY lol6 "&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;">
+]>
+<tv><channel id="bomb"><display-name>&lol6;</display-name></channel></tv>"""
+
+
+@pytest.mark.asyncio
+async def test_entity_expansion_is_not_resolved(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A billion-laughs guide is refused instead of expanded."""
+    async with session_factory() as session:
+        source = EpgSource(name="bomb", default_timezone="UTC")
+        session.add(source)
+        await session.flush()
+        # Six levels of ten would be 10^6 characters if the entities had been resolved.
+        with pytest.raises(XmltvError, match="amplification"):
+            await ingest_xmltv(session, source, BILLION_LAUGHS)
