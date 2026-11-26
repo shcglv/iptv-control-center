@@ -42,4 +42,5 @@ echo "applying database migrations"
 python -m alembic upgrade head
 
 echo "starting api"
-exec python -m uvicorn iptvcc.api:app --host 0.0.0.0 --port 8000 --proxy-headers
+exec python -m uvicorn iptvcc.api:app --host 0.0.0.0 --port 8000 --proxy-headers \
+    --forwarded-allow-ips "${IPTV_FORWARDED_ALLOW_IPS:-127.0.0.1}"

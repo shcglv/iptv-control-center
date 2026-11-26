@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.6] — 2026-11-26
+
+### Added
+
+- **`IPTV_FORWARDED_ALLOW_IPS`** is passed to uvicorn. Behind Coolify's Traefik the application used
+  to see the proxy's address as the client, because uvicorn only trusts `X-Forwarded-For` from
+  `127.0.0.1` by default. With port 8000 unpublished — which is how Coolify runs it — set this to
+  `*` so sessions, logs and the per-IP half of the rate limit see real addresses.
+- Verified against a PostgreSQL-backed container: a login sent with
+  `X-Forwarded-For: 203.0.113.9` recorded `203.0.113.9` in `admin_session.ip` instead of the proxy
+  address.
+
+### Notes
+
+- Trusting every peer is only safe because the container port is not exposed directly. Publishing
+  port 8000 would let a client forge its address and multiply its rate-limit allowance; the file
+  comment and `.env.example` say so.
+
 ## [1.7.5] — 2026-11-26
 
 ### Fixed
