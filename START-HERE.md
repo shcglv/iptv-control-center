@@ -1,6 +1,6 @@
 # Start here
 
-**IPTV Control Center 1.7.3** — a self-hosted control plane for IPTV. It imports provider playlists,
+**IPTV Control Center 1.7.4** — a self-hosted control plane for IPTV. It imports provider playlists,
 keeps one channel catalog, serves a per-device M3U and XMLTV guide, chooses the best source per
 channel, and answers playback with a `302` straight to the provider. **It never carries video.**
 

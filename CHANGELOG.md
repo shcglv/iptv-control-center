@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.4] — 2026-11-26
+
+### Fixed
+
+- **A first deploy could fail because the database was a few seconds late.** Coolify starts the
+  application and the database in parallel; the entrypoint ran `alembic upgrade head` immediately, so
+  a database still initialising made the app exit and the deploy look broken until the platform
+  restarted it. `scripts/start.sh` now waits for PostgreSQL, up to `IPTV_DB_WAIT_SECONDS` (default
+  120), before migrating.
+- The wait is bounded and honest: without a reachable database the container exits `1` with
+  `database unreachable after N attempts: <reason>`, so a genuinely missing database still fails the
+  deploy instead of hanging.
+- SQLite needs no wait and says so, so development and the test suites are unaffected.
+
+### Verified
+
+- Application started before its database existed: stayed running, logged `waiting for the database`,
+  then connected after 7 attempts and became `healthy` 20 seconds after PostgreSQL appeared.
+- With no database at all and a 6-second budget: exited `1` with the reason in the log.
+
 ## [1.7.3] — 2026-11-26
 
 ### Fixed
