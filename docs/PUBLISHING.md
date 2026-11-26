@@ -13,9 +13,9 @@ C:\Users\shcgl\Desktop\iptv-control-center-1.6.6.bundle
 plus tags up to `v1.6.6`.
 
 **The restore path was exercised, not assumed.** Cloning that bundle into a scratch directory gives a
-repository at the current `main` with all tags, `import iptvcc` reports `1.6.6`, and the M3U and
-client-capability suites run green from the clone (18 tests). So a lost workstation costs a clone, not
-a rewrite.
+repository at the current `main` (`57af7a8`) with tags up to `v1.7.9`, `import iptvcc` reports
+`1.7.9`, the copy's own `check_spec.py` and `check_docs.py` pass, and 26 tests run green from it. So a
+lost workstation costs a clone, not a rewrite.
 
 ## 1. Create an empty repository
 
