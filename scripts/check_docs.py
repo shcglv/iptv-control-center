@@ -169,7 +169,12 @@ def check_test_counts(head: str) -> None:
 
 
 def check_links() -> None:
-    targets = [ROOT / "README.md", ROOT / "RELEASE.md", ROOT / "CHANGELOG.md"]
+    targets = [
+        ROOT / "README.md",
+        ROOT / "RELEASE.md",
+        ROOT / "CHANGELOG.md",
+        ROOT / "START-HERE.md",
+    ]
     targets += sorted((ROOT / "docs").rglob("*.md"))
     pattern = re.compile(r"\[[^\]]*\]\(([^)#\s]+)(?:#[^)]*)?\)")
     for path in targets:
