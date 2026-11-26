@@ -4,6 +4,7 @@
 #   .\scripts\check.ps1 -SkipWeb     # backend only
 #   .\scripts\check.ps1 -Browser     # also run the Playwright tests
 #   .\scripts\check.ps1 -Fast        # skip pytest (lint and types only)
+#   .\scripts\check.ps1 -PnpmPath C:\path\to\pnpm.cjs   # pnpm outside PATH
 #
 # Prints one verdict line at the end and exits non-zero on any failure, so a gate that fails cannot
 # be mistaken for a notice. The ruff step covers `scripts` as well: a lint error in a tool went
@@ -12,7 +13,8 @@
 param(
     [switch]$SkipWeb,
     [switch]$Browser,
-    [switch]$Fast
+    [switch]$Fast,
+    [string]$PnpmPath = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -57,14 +59,23 @@ if (-not $Fast) {
 }
 
 if (-not $SkipWeb) {
-    $web = Join-Path $root "web"
-    Push-Location $web
-    try {
-        Invoke-Step "web typecheck" { pnpm typecheck }
-        Invoke-Step "web build" { pnpm build }
+    # A skipped step must never look like a passing one: without pnpm the gate fails and says why,
+    # instead of silently dropping the web checks from a run that then reports all-green.
+    $pnpm = if ($PnpmPath) { $PnpmPath } else { (Get-Command pnpm -ErrorAction SilentlyContinue).Source }
+    if (-not $pnpm) {
+        Write-Host "    FAILED: pnpm not found; install it, pass -PnpmPath, or use -SkipWeb" -ForegroundColor Red
+        $script:results += [pscustomobject]@{ Step = "web toolchain"; Result = "FAIL (pnpm missing)" }
     }
-    finally {
-        Pop-Location
+    else {
+        $web = Join-Path $root "web"
+        Push-Location $web
+        try {
+            Invoke-Step "web typecheck" { & $pnpm typecheck }
+            Invoke-Step "web build" { & $pnpm build }
+        }
+        finally {
+            Pop-Location
+        }
     }
 }
 

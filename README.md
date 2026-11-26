@@ -146,7 +146,10 @@ typecheck and build; then an image build with a container smoke test.
 .\scripts\check.ps1            # ruff, format, mypy, pytest, web typecheck + build
 .\scripts\check.ps1 -SkipWeb   # backend only
 .\scripts\check.ps1 -Browser   # also run the Playwright tests
+.\scripts\check.ps1 -PnpmPath C:\path\to\pnpm.cjs   # when pnpm is not on PATH
 ```
+
+A missing `pnpm` fails the gate with a message rather than quietly skipping the web steps.
 
 Manual equivalents:
 
