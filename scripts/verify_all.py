@@ -141,7 +141,13 @@ def main() -> int:
     if failed:
         print(f"\nVERIFICATION FAILED: {', '.join(failed)}")
         return 1
-    print(f"\nVERIFICATION PASSED ({len(results) - len(skipped)} drills, {len(skipped)} skipped)")
+    ran = len(results) - len(skipped)
+    if ran == 0:
+        # "PASSED (0 drills, N skipped)" was a green verdict for verifying nothing: the machine
+        # lacked Docker and the network, so every drill was skipped and the summary said PASSED.
+        print(f"\nVERIFICATION DID NOT RUN ({len(skipped)} drill(s) skipped, none executed)")
+        return 1
+    print(f"\nVERIFICATION PASSED ({ran} drills, {len(skipped)} skipped)")
     return 0
 
 
