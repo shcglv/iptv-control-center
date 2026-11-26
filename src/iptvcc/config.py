@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/iptv.db"
     public_base_url: str = "http://127.0.0.1:8000"
 
+    # Where `python -m iptvcc` listens. The container entrypoint passes its own host and port to
+    # uvicorn directly, so these matter for the documented launcher and for drills.
+    host: str = "127.0.0.1"
+    port: int = 8000
+
     # 32 raw bytes, base64-encoded. Empty in development: a well-known dev key is used
     # and a warning is logged once. Production MUST set it.
     encryption_key: str = ""

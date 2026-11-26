@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.5] — 2026-11-26
+
+### Fixed
+
+- **`python -m iptvcc` did nothing.** `__main__.py` defined `main()` but had no `__main__` guard, so
+  the documented launcher imported the module and exited silently — no server, no error, no log.
+- **The launcher could not run against PostgreSQL on Windows.** uvicorn 0.36+ stopped consulting
+  the event-loop policy and passes an explicit loop factory that builds a `ProactorEventLoop` on
+  Windows, which psycopg refuses. Setting the policy was not enough; the launcher now passes a
+  selector-loop factory, and `/healthz` answers `{"status":"ok","database":"ok"}`.
+
+### Added
+
+- `IPTV_HOST` and `IPTV_PORT` configure where `python -m iptvcc` listens (defaults `127.0.0.1:8000`);
+  the container entrypoint keeps passing its own values to uvicorn.
+- `scripts/verify_upgrade.py` — an upgrade drill: install the schema at `198a8944b683`, write data
+  through the real import path, upgrade to `head`, and check that the rows survived and the device
+  playlist is still served. Passes: `198a8944b683 -> ec324056e4de`, 1 channel, HTTP 200.
+
 ## [1.6.4] — 2026-11-26
 
 ### Fixed

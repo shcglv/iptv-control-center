@@ -1,3 +1,3 @@
 """IPTV Control Center — self-hosted control plane for IPTV."""
 
-__version__ = "1.6.4"
+__version__ = "1.6.5"
