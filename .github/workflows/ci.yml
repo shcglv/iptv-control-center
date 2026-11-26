@@ -43,6 +43,9 @@ jobs:
       - name: Documentation consistency
         run: python scripts/check_docs.py
 
+      - name: Specification invariants
+        run: python scripts/check_spec.py
+
       - name: Tests
         # conftest.py sets the required IPTV_* environment for the test database.
         run: pytest -q
@@ -77,6 +80,9 @@ jobs:
 
       - name: Documentation consistency
         run: python scripts/check_docs.py
+
+      - name: Specification invariants
+        run: python scripts/check_spec.py
 
       - name: Tests against PostgreSQL
         env:

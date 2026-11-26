@@ -18,3 +18,14 @@ def test_documentation_is_consistent() -> None:
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "DOCUMENTATION CONSISTENT" in completed.stdout
+
+
+def test_specification_invariants_hold() -> None:
+    completed = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "check_spec.py")],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert "SPECIFICATION INVARIANTS HOLD" in completed.stdout

@@ -17,8 +17,8 @@ was executed in one sitting, on one checkout, to remove the "each piece passed s
 |---|---|
 | `scripts/verify_all.py` (Docker and PostgreSQL available) | **7 passed**, 2 skipped — `decoder` and `smoke` need the internet |
 | `scripts/verify_all.py --only decoder` (internet enabled) | **1 passed** in 44.5 s |
-| Backend, SQLite | **272 passed**, 16 skipped, 221 s |
-| Backend, PostgreSQL 16 | **272 passed**, 16 skipped, 345 s |
+| Backend, SQLite | **273 passed**, 16 skipped, 221 s |
+| Backend, PostgreSQL 16 | **273 passed**, 16 skipped, 345 s |
 | Browser (Chromium) | **8 passed**, 128 s |
 | Container acceptance, image rebuilt from `72f980c` | **3 passed**, 46 s |
 
@@ -33,8 +33,8 @@ inherited from the 1.6.6 run:
 
 | Check | Result |
 |---|---|
-| Backend, SQLite | **272 passed**, 16 skipped |
-| Backend, PostgreSQL 16 | **272 passed**, 16 skipped, 281 s |
+| Backend, SQLite | **273 passed**, 16 skipped |
+| Backend, PostgreSQL 16 | **273 passed**, 16 skipped, 281 s |
 | Container acceptance, image built from `v1.7.0` | **3 passed**, 39 s |
 | Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
 
@@ -62,8 +62,8 @@ migrations on the live database) and fails by design in a bare checkout.
 
 | Area | Command | Result |
 |---|---|---|
-| Backend (SQLite) | `pytest -q` | **272 passed**, 16 skipped |
-| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **272 passed**, 16 skipped |
+| Backend (SQLite) | `pytest -q` | **273 passed**, 16 skipped |
+| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **273 passed**, 16 skipped |
 | Backup (PostgreSQL) | `scripts/verify_pg_container.py` | **PASSED** — migrations at start (`ec324056e4de`), import, 302 resolver, restart persistence, 78 KB dump with 28 table entries |
 | Restore (PostgreSQL) | `scripts/verify_restore.py` | **PASSED** — dump restored into a fresh database, row counts match across 28 tables (12 rows), and the application served 2 channels from the restored copy |
 | Upgrade (PostgreSQL) | `scripts/verify_upgrade.py` | **PASSED** — schema at `198a8944b683`, data written through the real import path, upgraded to `head`, rows intact, device playlist still served |
@@ -110,7 +110,7 @@ rather than a possibly-stale object. Repeat-accept is a `404` (the suggestion is
 ## Backend suite
 
 ```
-272 passed, 16 skipped
+273 passed, 16 skipped
 ```
 
 Coverage by area: M3U parsing and idempotent import (plus a 17-case provider corpus), matching,

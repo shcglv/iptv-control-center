@@ -35,6 +35,7 @@ class Drill:
 
 DRILLS: list[Drill] = [
     Drill("docs", "scripts/check_docs.py"),
+    Drill("spec", "scripts/check_spec.py"),
     Drill("scheduler", "scripts/verify_scheduler.py"),
     Drill("telegram", "scripts/verify_telegram.py"),
     Drill("panel", "scripts/verify_panel.py", needs=frozenset({"docker"})),
