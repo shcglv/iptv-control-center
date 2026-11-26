@@ -55,6 +55,26 @@ What the number includes and excludes matters:
 
 So treat 260 MiB as a floor for the import path, not as the container's steady-state footprint.
 
+## In the container, measured with `docker stats`
+
+The numbers above come from a benchmark process that generates its input in memory. The container
+looks different, and this is the more useful measurement for the 384 MB budget:
+
+| Situation | RSS |
+|---|---|
+| Idle, healthy, scheduler and Telegram disabled | **70–96 MiB** |
+| After importing 3 000 channels (253 KiB playlist, 3.0 s) | peak **96 MiB** |
+| While ingesting a 10.7 MiB guide, 60 000 programmes (12.7 s) | peak **130 MiB** |
+
+Scaling the EPG figure to the 38 MiB guide used in the benchmark suggests roughly **215 MiB** — an
+extrapolation, not a measurement, and worth stating as one.
+
+The practical reading: the application has roughly 250 MiB of headroom against its 384 MB budget at
+the sizes this project targets. The shape of the risk is the guide, not the channel count — the whole
+document is held in memory during ingest, so a maximum-size upload (the API accepts up to 64 MiB)
+would be the expensive case. `IPTV_MAX_REQUEST_BYTES` and the fetcher's 50 MB cap are what keep that
+bounded.
+
 ## Re-measured at 1.6.5
 
 Same tool, deliberately different parameters to check the shape of the curve rather than a single
