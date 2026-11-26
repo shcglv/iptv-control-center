@@ -1,11 +1,15 @@
 # Release 1.6.6
 
-Verified end to end as an artifact: backend on both databases, browser, container, both backup drills, a real public playlist and guide, a real decoder through the 302, and the panel's own preflight inside the image. **It has not been deployed anywhere yet** — that is step 10.
+Verified as an artifact: 271 backend tests on SQLite **and** PostgreSQL 16, the browser suite, the
+container acceptance run, an install drill, an upgrade drill, a backup and a restore drill, a real
+public playlist and guide, a real decoder through the `302`, the panel's own preflight inside the
+image, and a security audit with six findings fixed. **It has not been deployed anywhere yet** — that
+is step 10.
 
 - Version: `1.6.6`
-- Image: built from this commit, 367 MB default
+- Image: one Dockerfile, `python:3.12-slim` base, roughly 370 MB by default
 - Evidence: [`docs/VERIFICATION.md`](docs/VERIFICATION.md) · status:
-  [`docs/STATUS.md`](docs/STATUS.md)
+  [`docs/STATUS.md`](docs/STATUS.md) · security: [`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md)
 
 ## What it does
 
@@ -13,9 +17,10 @@ A self-hosted control plane for IPTV. It imports provider playlists, keeps one c
 serves a per-device M3U and XMLTV guide, picks the best source per channel from health data, and
 answers playback with a `302` straight to the provider. **It never carries video.**
 
-Screens: Overview (with a system check), Channels (with per-channel diagnostics), Quality, Discovery,
-Playlists (with group visibility), Catalog (with a duplicate review queue), Sources, Devices. Telegram
-bot for status and alerts. Backups, preflight and a runbook.
+Screens: Overview (with a system check), Channels (per-channel diagnostics), Quality, Discovery,
+Playlists (group visibility, ordering, drag-and-drop), Catalog (identity catalog, take-down blocks,
+duplicate review), Sources, Devices, Login. Telegram bot for status and alerts. Backups, preflight,
+runbook.
 
 ## Install — ten steps
 
@@ -35,19 +40,38 @@ bot for status and alerts. Backups, preflight and a runbook.
    | `IPTV_TELEGRAM_BOT_TOKEN` | optional |
    | `IPTV_TELEGRAM_OWNER_ID` | optional, your numeric id |
 
-6. **Deploy.** The log must show `alembic upgrade head` reaching `198a8944b683`, then Uvicorn, then
-   `telegram bot started` if a token is set.
-7. **Preflight inside the container**: `docker exec <container> python scripts/preflight.py` →
-   expect `0 failed`. Do not continue on a failure.
-8. **First admin**: `docker exec -it <container> python -m iptvcc.cli create-admin --email … --password '…'`.
+   Optional and safe to leave alone: `IPTV_EPG_MAX_BYTES` (5 MB), `IPTV_MAX_REQUEST_BYTES` (64 MB),
+   `IPTV_PUBLIC_RATE_LIMIT_PER_MINUTE` (120). The API schema stays off in production; set
+   `IPTV_ENABLE_DOCS=true` only when you genuinely need it.
+
+6. **Deploy.** The log must show the Alembic upgrade reaching `ec324056e4de`, then
+   `Uvicorn running`, then `telegram bot started` if a token is set.
+7. **Check it is wired correctly** — either way, both run the same eight checks:
+   ```bash
+   docker exec <container> python scripts/preflight.py     # expect 0 failed
+   ```
+   or, with no shell at all: log in → Overview → **Система** → `Проверить`. Do not continue on a
+   failure.
+8. **First admin**:
+   `docker exec -it <container> python -m iptvcc.cli create-admin --email … --password '…'`.
    The TOTP secret is printed once.
-9. **Backups**: enable the Coolify database schedule; add an off-server copy.
+9. **Backups**: enable the Coolify database schedule; add an off-server copy. The dump format is
+   verified restorable — see `scripts/verify_restore.py`.
 10. **Acceptance**: run [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) with a real provider and one TV.
 
 ## Verify it is alive
 
+From any machine, without credentials:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\smoke_public.py --base https://iptv.joxit.ru
+```
+
+Five checks: health, login page, a built asset, security headers, and the TLS certificate's remaining
+life. It exits non-zero and names the failure if something is wrong.
+
 ```bash
-curl -fsS https://iptv.joxit.ru/healthz          # {"status":"ok"}
+curl -fsS https://iptv.joxit.ru/healthz     # {"status":"ok", …}
 ```
 
 Then log in, create a source, import a playlist, create a device, and open the M3U in VLC.
@@ -58,22 +82,30 @@ Then log in, create a source, import a playlist, create a device, and open the M
 - Migration applied → stop the app, restore the pre-deploy backup, redeploy the previous image.
 - Wrong env value → fix the variable and redeploy; no data impact.
 
-Details and the risk register: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+The upgrade path itself is drilled: `scripts/verify_upgrade.py` starts at `198a8944b683`, writes data
+through the real import path, upgrades to head, and checks that the rows survived and the playlist is
+still served.
 
 ## Included, verified
 
-Direct streaming · M3U import with a provider corpus · channel catalog and identity catalog with
-take-down blocks · playlist profiles (visibility, order, drag-and-drop, source pins) · devices with
-hashed tokens and rotation · XMLTV ingest with a corpus · per-device guide cached per profile ·
-health probes, composite score, anti-flapping, autonomous scheduler · active probe mode (opt-in
-image) · discovery with review queue · Telegram bot with dedupe · nine UI screens · SSRF suite ·
-rate limiting · request ids and channel diagnosis · SQLite **and** PostgreSQL · backups with drilled
-restores · preflight · runbook.
+Direct streaming with the container guard · M3U import with a provider corpus and a linear parser ·
+channel catalog and identity catalog with take-down blocks · duplicate detection with a review queue
+and a merge that moves links, overrides and EPG mapping · playlist profiles with visibility, ordering,
+drag-and-drop and source pins · **group (category) visibility** · **client compatibility** per device
+family (TS/HLS/DASH rules, per-family guide caps) · **smart-TV guide cap** (7→3→1-day windows, never
+truncated XML) · devices with hashed tokens and rotation · XMLTV ingest with a corpus and dictionary
+hardening · per-device guide cached per profile · health probes, composite score, anti-flapping,
+autonomous scheduler · active probe mode (opt-in image) · discovery with a review queue · Telegram bot
+with dedupe and a hardened poller · nine UI screens, usable at phone width · SSRF suite · rate
+limiting · request ids and channel diagnosis · browser-hardening headers · `nosniff`, `DENY`, HSTS on
+HTTPS · SQLite **and** PostgreSQL · backups **and** drilled restores · preflight, upgrade drill,
+smoke check, system panel · runbook.
 
 ## Not included
 
-- Client Compatibility Engine, fuzzy match review queue, smart-TV guide cap, category editor in the
-  playlist studio, authenticated forum sessions, scheduled re-crawls, provider slot budget, Telegram
-  widgets. Each is listed in [`docs/STATUS.md`](docs/STATUS.md).
-- A deployed instance, a real provider run, a real Telegram delivery, and a CI execution: all three
-  need owner actions (credentials, GO, a TV).
+- Manual channel split, per-field overrides, the two-device studio impact panel and in-editor
+  preview, authenticated forum sessions, scheduled discovery re-crawls, per-source provider slot
+  budget, Telegram widgets, SBOM and container image scanning. Each is listed in
+  [`docs/STATUS.md`](docs/STATUS.md).
+- A deployed instance, a real provider run, a real Telegram delivery, a real player on a television,
+  and a CI execution: all need owner actions — credentials, a GO, and a TV.
