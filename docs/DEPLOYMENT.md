@@ -61,7 +61,10 @@ Fits the current server headroom: ~1.7 GB available, well under the 640 MB budge
    ```
    Expected `0 failed`. Do not continue on a failure. The same eight checks are available from the
    panel — Overview → **Система** → `Проверить` — which is the easier option when you have no shell
-   at hand.
+   at hand. To exercise that path against a local image before deploying:
+   ```powershell
+   .\.venv\Scripts\python.exe scripts\verify_panel.py
+   ```
 8. **First admin:**
    ```bash
    docker exec -it <container> python -m iptvcc.cli create-admin --email you@example.com --password '<12+ chars>'
