@@ -154,7 +154,7 @@ def check_test_counts(head: str) -> None:
 
     # Two phrases that went stale without any version number changing: a requirements table that
     # named an old migration head, and an audit that cited a test count from four releases earlier.
-    for path in sorted((ROOT / "docs").glob("*.md")) + [ROOT / "README.md", ROOT / "RELEASE.md"]:
+    for path in [*sorted((ROOT / "docs").glob("*.md")), ROOT / "README.md", ROOT / "RELEASE.md"]:
         text = read(path)
         for named in re.findall(r"migrations reach `([0-9a-f]{6,})`", text):
             if named != head:
