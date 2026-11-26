@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.9] — 2026-11-26
+
+### Changed
+
+- **`scripts/check.ps1` is now a gate that cannot be misread.** It covers `src tests scripts` like CI
+  does (a lint error in a tool had been outside the gate for ten rounds), checks formatting, runs the
+  specification check, collects every step instead of stopping at the first failure, prints a table
+  and one verdict line, and exits non-zero on any failure. `-Fast` skips pytest.
+- `ruff format` applied: seven files, four of them product code. Cosmetic only — line joins and one
+  blank line — but they had drifted because formatting was never part of the gate actually run.
+
 ## [1.7.8] — 2026-11-26
 
 Verification and release tooling. No product behaviour changed.
