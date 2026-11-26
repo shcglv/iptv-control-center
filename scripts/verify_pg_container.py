@@ -176,10 +176,18 @@ def main() -> int:
         ).json()["stats"]
         print("import:", stats)
 
-        profile = client.post("/api/v1/profiles", json={"name": "PG"}, headers=headers).json()
-        device = client.post(
-            "/api/v1/devices", json={"name": "PG TV", "profile_id": profile["id"]}, headers=headers
-        ).json()
+        profile_response = client.post(
+            "/api/v1/profiles", json={"name": "PG"}, headers=headers
+        )
+        assert profile_response.status_code == 201, profile_response.text
+        profile = profile_response.json()
+        device_response = client.post(
+            "/api/v1/devices",
+            json={"name": "PG TV", "profile_id": profile["id"]},
+            headers=headers,
+        )
+        assert device_response.status_code == 201, device_response.text
+        device = device_response.json()
         playlist = client.get(f"/p/{device['token']}/live.m3u").text
         assert playlist.count("#EXTINF") == 2, playlist[:400]
         first = next(line for line in playlist.splitlines() if "/s/" in line)

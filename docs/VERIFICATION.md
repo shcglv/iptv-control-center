@@ -1,7 +1,7 @@
 # Verification report
 
-**Date:** 2026-11-25
-**Version:** 1.0.0 (tagged `v1.0.0`)
+**Date:** 2026-11-26
+**Version:** 1.4.0 (tagged `v1.4.0`)
 **Environment:** Windows development machine, Python 3.12.0, Docker 29.9.3, Chromium via Playwright
 **Database under test:** SQLite **and PostgreSQL 16** — the full suite passes on both
 
@@ -12,12 +12,12 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 
 | Area | Command | Result |
 |---|---|---|
-| Backend (SQLite) | `pytest -q` | **232 passed**, 9 skipped |
-| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **232 passed**, 9 skipped |
-| Backup (PostgreSQL) | `scripts/verify_pg_container.py` | **PASSED** — migrations at start, import, 302 resolver, restart persistence, 73 KB dump with 27 table entries |
+| Backend (SQLite) | `pytest -q` | **251 passed**, 13 skipped |
+| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **251 passed**, 13 skipped |
+| Backup (PostgreSQL) | `scripts/verify_pg_container.py` | **PASSED** — migrations at start (`ec324056e4de`), import, 302 resolver, restart persistence, 78 KB dump with 28 table entries |
 | Lint | `ruff check src tests scripts` | clean |
-| Types | `mypy src` | clean, 39 files |
-| Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | **6 passed** |
+| Types | `mypy src` | clean, 41 files |
+| Browser | `pytest tests/test_browser.py` (`IPTV_BROWSER_TESTS=1`) | **7 passed** |
 | Container | `pytest tests/test_container.py` (`IPTV_CONTAINER_TESTS=1`) | **3 passed**, image rebuilt from HEAD |
 | Real public data | `pytest tests/test_real_world.py` (`IPTV_NETWORK_TESTS=1`) | **3 passed** — 1 059-entry public playlist imported to 1 028 channels; 7/12 real streams reachable; 3 channels resolved to real HLS URLs (`HEAD` 200). Details: [`REAL-WORLD.md`](REAL-WORLD.md) |
 | Real EPG + active probe | `data/live_real_epg.py`, ffprobe in the ffmpeg image | 20.9 MiB public guide → 287 channels / 48 814 programmes; ffprobe read a real HLS stream (1280×720 h264) and correctly failed a zero-stream manifest |
@@ -25,24 +25,36 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 | Preflight | `scripts/preflight.py` | 8/8 with a valid key; fails correctly without one |
 | Performance | `scripts/bench_scale.py --channels 3000 ...` | import 1.78 s, render 0.34 s, EPG 12.4 s, guide 4.5 s |
 
+### A PostgreSQL-only defect found by this sweep
+
+The duplicate-merge path passed all 251 SQLite tests and failed three tests on PostgreSQL with
+`StaleDataError`. Cause: deleting the duplicate channel cascaded to the `match_suggestion` row that
+pointed at it, so the follow-up `UPDATE … status='accepted'` matched zero rows. SQLite does not
+enforce foreign keys by default, so the cascade never happened there. The merge now removes the
+resolved suggestion explicitly, before the channel, and checks the decision against the database
+rather than a possibly-stale object. Repeat-accept is a `404` (the suggestion is gone), not a `409`.
+
 ## Backend suite
 
 ```
-231 passed, 9 skipped
+251 passed, 13 skipped
 ```
 
 Coverage by area: M3U parsing and idempotent import (plus a 17-case provider corpus), matching,
 quality scoring and anti-flapping, scheduler lease, EPG ingest and mapping (plus a 19-case XMLTV
-corpus), delivery and the 302 resolver, profiles and drag ordering, discovery (extractors, adapters,
-review), Telegram (adapter, commands, notifications), auth and CSRF, SSRF rules, rate limiting,
-backups, catalog and blocks, preflight, diagnostics and request ids, active probe mode.
+corpus, and the smart-TV guide cap), delivery and the 302 resolver, client capabilities per device
+family, profiles and drag ordering, category visibility, duplicate detection and merge, discovery
+(extractors, adapters, review), Telegram (adapter, commands, notifications), auth and CSRF, SSRF
+rules, rate limiting, backups, catalog and blocks, preflight, diagnostics and request ids, active
+probe mode.
 
-The 9 skips are the six browser tests and three container tests, which are opt-in.
+The 13 skips are the seven browser tests, three container tests and three network tests, which are
+opt-in.
 
 ## Browser suite
 
 ```
-6 passed
+7 passed
 ```
 
 Against a real server process and Chromium: login with a live TOTP and navigation across every

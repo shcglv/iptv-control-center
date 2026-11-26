@@ -110,9 +110,15 @@ async def merge_channels(session: AsyncSession, suggestion: MatchSuggestion) -> 
     override on the keep side wins over the dropped one.
     """
     keep_id, drop_id = suggestion.keep_id, suggestion.drop_id
-    if suggestion.status != "new":
-        # Defensive: the API already refuses a repeated accept, and the service must too.
-        raise ValueError(f"suggestion already {suggestion.status}")
+    # Read the decision from the database, not from the possibly-stale object: a second accept
+    # must fail even when the row was removed by a cascade.
+    current = await session.scalar(
+        select(MatchSuggestion.status).where(MatchSuggestion.id == suggestion.id)
+    )
+    if current is None:
+        raise ValueError("suggestion no longer exists")
+    if current != "new":
+        raise ValueError(f"suggestion already {current}")
     if keep_id == drop_id:
         raise ValueError("cannot merge a channel into itself")
 
@@ -160,9 +166,10 @@ async def merge_channels(session: AsyncSession, suggestion: MatchSuggestion) -> 
             (MatchSuggestion.keep_id == drop_id) | (MatchSuggestion.drop_id == drop_id),
         )
     )
+    # Delete the resolved suggestion before the channel: the channel FK cascades, and relying on
+    # that made the answer differ between SQLite (FKs off by default) and PostgreSQL.
+    await session.execute(delete(MatchSuggestion).where(MatchSuggestion.id == suggestion.id))
     await session.execute(delete(Channel).where(Channel.id == drop_id))
-
-    suggestion.status = "accepted"
     await session.flush()
 
 

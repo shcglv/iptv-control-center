@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] — 2026-11-26
+
+### Fixed
+
+- **Duplicate merge failed on PostgreSQL.** Deleting the duplicate channel cascaded to the
+  `match_suggestion` row that referenced it, so the following `UPDATE … status='accepted'` matched
+  zero rows and raised `StaleDataError`. SQLite does not enforce foreign keys by default, which is
+  why 251 SQLite tests passed while three failed on PostgreSQL. The merge now deletes the resolved
+  suggestion explicitly before the channel and reads the decision from the database rather than a
+  possibly-stale object.
+- Consequence, now intended and documented: a resolved suggestion is removed with the duplicate, so
+  accepting it twice returns `404`, not `409`. The queue holds open decisions only.
+
+### Verified
+
+- Full suite on **both** databases at 1.4.0/1.4.1: 251 passed on SQLite and PostgreSQL 16.
+- PostgreSQL container drill at 1.4.0: migrations `ec324056e4de`, import, 302, restart persistence,
+  78 KB dump with 28 table entries.
+- Container acceptance on an image rebuilt from HEAD: 3 passed.
+
 ## [1.4.0] — 2026-11-25
 
 ### Added

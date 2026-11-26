@@ -113,7 +113,8 @@ async def test_merge_moves_links_and_deletes_the_duplicate(
             .where(ChannelStream.channel_id == keep_id)
         )
         assert kept_links == 2  # its own link plus the one rescued from the duplicate
-        assert suggestion.status == "accepted"
+        # The resolved suggestion is removed with the duplicate: the queue is open decisions only.
+        assert await session.get(MatchSuggestion, suggestion.id) is None
 
 
 @pytest.mark.asyncio
@@ -131,7 +132,7 @@ async def test_merge_is_not_repeatable(
 
         from iptvcc.services.suggestions import merge_channels as merge_again
 
-        with pytest.raises(ValueError, match="already accepted"):
+        with pytest.raises(ValueError, match="no longer exists"):
             await merge_again(session, suggestion)
 
 
@@ -171,7 +172,8 @@ async def test_match_api_flow(client: httpx.AsyncClient) -> None:
     assert "Eurosport 1" in names
 
     again = await client.post(f"/api/v1/matches/{suggestion['id']}/accept", headers=ADMIN_HEADERS)
-    assert again.status_code == 409
+    # The suggestion is gone once resolved, so a second accept is a 404 rather than a 409.
+    assert again.status_code == 404
 
 
 @pytest.mark.asyncio
