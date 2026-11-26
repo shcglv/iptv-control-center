@@ -55,7 +55,7 @@ rather than a possibly-stale object. Repeat-accept is a `404` (the suggestion is
 ## Backend suite
 
 ```
-266 passed, 13 skipped
+271 passed, 13 skipped
 ```
 
 Coverage by area: M3U parsing and idempotent import (plus a 17-case provider corpus), matching,
