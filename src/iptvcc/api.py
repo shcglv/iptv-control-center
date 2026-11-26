@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import datetime
@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import __version__
 from .auth import (
@@ -130,6 +131,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await dispose_engine()
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Apply browser-hardening headers to every response.
+
+    The panel shares an origin with the API and is never meant to be framed, sniffed or to leak a
+    referrer, so this belongs to the application rather than to three hand-picked handlers. HSTS is
+    added only for an HTTPS base URL: sending it over plain-HTTP development would pin a scheme the
+    developer cannot serve.
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
+        response: Response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault(
+            "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
+        )
+        if get_settings().public_base_url.startswith("https://"):
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
+        return response
+
+
 app = FastAPI(
     title="IPTV Control Center",
     version=__version__,
@@ -138,6 +163,7 @@ app = FastAPI(
 )
 configure_logging()
 app.add_middleware(RequestContextMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # --- admin auth --------------------------------------------------------------------------------

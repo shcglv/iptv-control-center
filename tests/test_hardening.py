@@ -83,3 +83,37 @@ async def test_admin_api_is_not_rate_limited_by_the_public_window(
 ) -> None:
     for _ in range(LIMIT * 2):
         assert (await client.get("/api/v1/sources", headers=ADMIN_HEADERS)).status_code == 200
+
+
+# --- security headers --------------------------------------------------------------------------
+
+BROWSER_HEADERS = (
+    "x-content-type-options",
+    "x-frame-options",
+    "referrer-policy",
+    "permissions-policy",
+)
+
+
+@pytest.mark.asyncio
+async def test_every_response_carries_the_browser_headers(anon_client: httpx.AsyncClient) -> None:
+    for path in ("/healthz", "/", "/api/v1/nope"):
+        response = await anon_client.get(path)
+        for header in BROWSER_HEADERS:
+            assert header in response.headers, (path, header)
+        assert response.headers["x-frame-options"] == "DENY"
+        assert response.headers["x-content-type-options"] == "nosniff"
+
+
+@pytest.mark.asyncio
+async def test_hsts_only_when_the_base_url_is_https(
+    anon_client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plain = await anon_client.get("/healthz")
+    assert "strict-transport-security" not in plain.headers
+
+    monkeypatch.setattr(
+        get_settings(), "public_base_url", "https://iptv.example.test", raising=False
+    )
+    secure = await anon_client.get("/healthz")
+    assert secure.headers["strict-transport-security"].startswith("max-age=31536000")

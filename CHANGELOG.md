@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] — 2026-11-26
+
+### Security
+
+- **Browser-hardening headers on every response.** A new `scripts/smoke_public.py` checked a running
+  instance and found only three handlers set `X-Content-Type-Options`; the HTML shell and the health
+  endpoint set nothing. A middleware now applies `nosniff`, `X-Frame-Options: DENY`,
+  `Referrer-Policy: no-referrer` and a restrictive `Permissions-Policy` to everything.
+- `Strict-Transport-Security` is added only when `IPTV_PUBLIC_BASE_URL` is HTTPS, so development over
+  plain HTTP is not pinned to a scheme it cannot serve.
+
+### Added
+
+- `scripts/smoke_public.py --base https://…` — a 5-check post-deployment smoke test: health, login
+  page, a built asset, security headers, and TLS certificate lifetime. No credentials, no shell on
+  the server. Against a non-IPTV site it fails correctly (negative control).
+
 ## [1.5.0] — 2026-11-26
 
 ### Added
