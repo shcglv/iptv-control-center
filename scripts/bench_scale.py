@@ -150,6 +150,16 @@ async def run(channels: int, sources: int, epg_channels: int, programmes: int) -
         )
 
         if epg_channels:
+            total_programmes = epg_channels * programmes
+            # `--programmes` is per channel: 500 x 20000 is ten million programmes and about a
+            # gigabyte of XML, which used to be attempted and then died in the ingest limit.
+            if total_programmes > 600_000:
+                print(
+                    f"{total_programmes:,} programmes requested "
+                    f"({epg_channels} channels x {programmes}). That is far above any realistic "
+                    "guide; lower --programmes (per channel) or --epg-channels."
+                )
+                return 2
             start = datetime.now(UTC).replace(second=0, microsecond=0)
             xml = build_xmltv(epg_channels, programmes, start)
             print(

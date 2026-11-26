@@ -28,7 +28,7 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 | Panel checks in the container | `scripts/verify_panel.py` | **PASSED** — 8/8 `ok` in a production-shaped container (`app_env=production`, HTTPS base URL), migrations `ec324056e4de`, version 1.6.5 |
 | Restore (SQLite) | `data/live_restore_drill.py` | **PASSED** |
 | Preflight | `scripts/preflight.py` | 8/8 with a valid key; fails correctly without one |
-| Performance | `scripts/bench_scale.py --channels 3000 ...` | import 1.78 s, render 0.34 s, EPG 12.4 s, guide 4.5 s |
+| Performance | `scripts/bench_scale.py --channels 3000 --sources 10 --epg-channels 100 --programmes 2400` | import 5.58 s (30 000 streams), re-run 3.17 s, render 0.82 s, EPG 37.67 s (240 000 programmes), guide 2.01 s |
 
 ### Two test-side defects found during this sweep
 

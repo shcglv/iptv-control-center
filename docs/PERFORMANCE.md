@@ -32,6 +32,29 @@ pessimistic baseline, not as production SLOs.
 At 3 000 channels / 72 000 programmes the same run gives: import 2.1 s, re-run 0.8 s, render 0.36 s,
 EPG ingest 13.8 s, guide 4.9 s.
 
+## Re-measured at 1.6.5
+
+Same tool, deliberately different parameters to check the shape of the curve rather than a single
+point: **3 000 channels × 10 sources (30 000 streams)** and 240 000 programmes.
+
+| Operation | Time | Notes |
+|---|---|---|
+| Import (cold) | **5.58 s** | 30 000 streams, 3.32 MiB playlist |
+| Import (re-run) | **3.17 s** | 30 000 unchanged |
+| Playlist render | **0.82 s** | median of 3, 572 KiB, p90 0.85 s |
+| EPG ingest | **37.67 s** | 240 000 programmes, 38.43 MiB XML |
+| EPG mapping | **0.08 s** | 100 EPG channels |
+| Guide build | **2.01 s** | 5.3 MiB XML, 0.4 MiB gzip |
+
+Read against the table above: import at 30 000 streams costs 5.58 s versus 7.7 s at the same stream
+count in the 10 000-channel run, and EPG ingest improved from 43.7 s to 37.7 s for the same 240 000
+programmes — consistent with the single-pass attribute parser that replaced the quadratic regex.
+The guide is much smaller here because only 100 channels carry EPG data.
+
+A parameter worth knowing: `--programmes` is **per channel**, so
+`--epg-channels 500 --programmes 20000` asks for ten million programmes, not twenty thousand. That
+run is refused with a clear message rather than a traceback.
+
 ## What was actually slow
 
 1. **One `flush()` per new channel during import.** A playlist creates a channel per unique
