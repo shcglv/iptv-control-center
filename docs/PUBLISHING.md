@@ -6,14 +6,14 @@ directory — it needs a Git remote. This is the missing step, and it needs your
 A complete history bundle is prepared next to the project:
 
 ```
-C:\Users\shcgl\Desktop\iptv-control-center-1.6.4.bundle
+C:\Users\shcgl\Desktop\iptv-control-center-1.6.6.bundle
 ```
 
 `git bundle verify` reports *"The bundle records a complete history"* and lists `refs/heads/main`
-plus tags up to `v1.6.4`.
+plus tags up to `v1.6.6`.
 
 **The restore path was exercised, not assumed.** Cloning that bundle into a scratch directory gives a
-repository at the current `main` with all tags, `import iptvcc` reports `1.6.4`, and the M3U and
+repository at the current `main` with all tags, `import iptvcc` reports `1.6.6`, and the M3U and
 client-capability suites run green from the clone (18 tests). So a lost workstation costs a clone, not
 a rewrite.
 
