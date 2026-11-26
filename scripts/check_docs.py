@@ -13,6 +13,7 @@ review kept missing:
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -94,6 +95,56 @@ def check_migration_head(head: str) -> None:
                 NOTES.append(f"{relative} mentions revision {found}; head is {head}")
 
 
+def check_test_counts() -> None:
+    """The counts in VERIFICATION.md must match what pytest actually collects.
+
+    They drifted twice: the report described 232 and later 266 tests when the suite had grown. The
+    count is cheap to obtain (`--collect-only` takes a few seconds) and comparing it turns a hand-
+    maintained number into a checked one. "passed + skipped" is compared, because which tests pass
+    depends on the environment; how many exist does not.
+    """
+    verification = read(ROOT / "docs" / "VERIFICATION.md")
+    # The count appears both in a plain code block and in bold table cells; allow the emphasis.
+    documented = {
+        (int(passed), int(skipped))
+        for passed, skipped in re.findall(
+            r"(\d+)\s+passed\**\s*,?\s*\**\s*(\d+)\s+skipped", verification
+        )
+    }
+    if not documented:
+        fail("docs/VERIFICATION.md has no 'N passed, M skipped' line to verify")
+        return
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        fail("pytest --collect-only failed; cannot verify the documented test count")
+        return
+
+    collected = None
+    for line in reversed(completed.stdout.splitlines()):
+        match = re.search(r"(\d+) tests? collected", line)
+        if match is not None:
+            collected = int(match.group(1))
+            break
+    if collected is None:
+        fail("could not read the collected test count from pytest")
+        return
+
+    for passed, skipped in sorted(documented):
+        if passed + skipped != collected:
+            fail(
+                f"docs/VERIFICATION.md documents {passed + skipped} tests "
+                f"({passed} passed + {skipped} skipped); pytest collects {collected}"
+            )
+    if len(documented) > 1:
+        NOTES.append(f"VERIFICATION.md states {len(documented)} different test counts")
+
+
 def check_links() -> None:
     targets = [ROOT / "README.md", ROOT / "RELEASE.md", ROOT / "CHANGELOG.md"]
     targets += sorted((ROOT / "docs").rglob("*.md"))
@@ -119,6 +170,7 @@ def main() -> int:
     check_migration_head(head)
 
     check_links()
+    check_test_counts()
 
     for note in NOTES:
         print(f"note: {note}")
