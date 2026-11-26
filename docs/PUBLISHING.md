@@ -79,3 +79,20 @@ the first push is also its first test. If a job fails, the log is the next debug
 - `data/` (scratch databases, benchmarks, live-check scripts) — regenerated locally.
 - `src/iptvcc/static/` and `web/node_modules/` — built by CI and by the Dockerfile.
 - `.env` files — only `.env.example` is tracked.
+
+## Bumping the version
+
+Use the script, not a text replace:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\bump_version.py 1.8.0 --dry-run
+.\.venv\Scripts\python.exe scripts\bump_version.py 1.8.0
+```
+
+It updates exactly the places that state the *current* version — pyproject, the package, the README
+status line, the RELEASE title and version bullet, the START-HERE title, and the STATUS and
+VERIFICATION headers — and refuses if any of them disagrees with the current version.
+
+A blanket replace was used until 1.7.7 and it silently relabelled a historical re-acceptance section
+as if it had been measured on the newer build. This script cannot do that: it never rewrites another
+version number, a measured count, or a section heading.
