@@ -38,6 +38,27 @@ inherited from the 1.6.6 run:
 | Container acceptance, image built from `v1.7.0` | **3 passed**, 39 s |
 | Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
 
+## Drill matrix at `2f5a5e7` (1.7.9)
+
+`ruff format` had touched four product files, so the drills — not just the suites — were re-run on
+that commit:
+
+| Drill | Result | Time |
+|---|---|---|
+| docs | passed | 10.8 s |
+| spec | passed | 2.4 s |
+| scheduler | passed | 17.4 s |
+| telegram | passed | 22.7 s |
+| write-abort | passed | 7.2 s |
+| panel | passed | 32.0 s |
+| upgrade | passed | 30.4 s |
+| restore | passed | 29.2 s |
+| postgres-container | passed | 157.9 s |
+| decoder (network) | passed | 63.0 s |
+
+`smoke` is the only one not run: it needs a deployed base URL, which does not exist yet. That is the
+whole reason this is a release candidate and not a live service.
+
 ## Re-acceptance at `e424a3c` (1.7.7)
 
 The entrypoint gained a database wait loop and the session dependency gained `scope="function"`, so
