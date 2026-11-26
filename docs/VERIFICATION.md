@@ -8,6 +8,26 @@
 Every command below was run for this report; nothing is copied from earlier rounds. What is *not*
 verified is listed at the end, and mapped against the specification in [`STATUS.md`](STATUS.md).
 
+## One command for the whole matrix
+
+The drills live in separate scripts because each needs something different. `scripts/verify_all.py`
+runs them in order, detects what the machine can support, skips the rest with a reason, and prints a
+summary table:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\verify_all.py
+.\.venv\Scripts\python.exe scripts\verify_all.py --skip-docker --skip-network
+.\.venv\Scripts\python.exe scripts\verify_all.py --only panel --only upgrade
+.\.venv\Scripts\python.exe scripts\verify_all.py --base https://iptv.joxit.ru
+```
+
+It reports `VERIFICATION PASSED` or names the failing drills and exits non-zero. Docker-dependent
+drills are skipped when the daemon is absent, network-dependent ones when the internet is; the smoke
+drill additionally needs `--base`.
+
+`scripts/preflight.py` is deliberately **not** in the list: it checks a *deployment* (key, base URL,
+migrations on the live database) and fails by design in a bare checkout.
+
 ## Summary
 
 | Area | Command | Result |

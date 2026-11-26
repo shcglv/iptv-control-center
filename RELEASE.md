@@ -59,6 +59,14 @@ runbook.
    verified restorable — see `scripts/verify_restore.py`.
 10. **Acceptance**: run [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) with a real provider and one TV.
 
+## Reproduce the verification
+
+All drills in one command, with Docker and network requirements detected and skipped when absent:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\verify_all.py
+```
+
 ## Verify it is alive
 
 From any machine, without credentials:
