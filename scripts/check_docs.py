@@ -95,7 +95,7 @@ def check_migration_head(head: str) -> None:
                 NOTES.append(f"{relative} mentions revision {found}; head is {head}")
 
 
-def check_test_counts() -> None:
+def check_test_counts(head: str) -> None:
     """The counts in VERIFICATION.md must match what pytest actually collects.
 
     They drifted twice: the report described 232 and later 266 tests when the suite had grown. The
@@ -144,6 +144,22 @@ def check_test_counts() -> None:
     if len(documented) > 1:
         NOTES.append(f"VERIFICATION.md states {len(documented)} different test counts")
 
+    # Two phrases that went stale without any version number changing: a requirements table that
+    # named an old migration head, and an audit that cited a test count from four releases earlier.
+    for path in sorted((ROOT / "docs").glob("*.md")) + [ROOT / "README.md", ROOT / "RELEASE.md"]:
+        text = read(path)
+        for named in re.findall(r"migrations reach `([0-9a-f]{6,})`", text):
+            if named != head:
+                fail(f"{path.name} says migrations reach {named}; head is {head}")
+        for count in re.findall(r"the (\d+) tests", text):
+            # "the N tests" describes a passing run, so it is compared with the documented pass
+            # count, not with what pytest collects (which includes the opt-in skips).
+            if documented and int(count) != sorted(documented)[0][0]:
+                fail(
+                    f"{path.name} cites {count} tests; "
+                    f"VERIFICATION.md documents {sorted(documented)[0][0]} passed"
+                )
+
 
 def check_links() -> None:
     targets = [ROOT / "README.md", ROOT / "RELEASE.md", ROOT / "CHANGELOG.md"]
@@ -170,7 +186,7 @@ def main() -> int:
     check_migration_head(head)
 
     check_links()
-    check_test_counts()
+    check_test_counts(head)
 
     for note in NOTES:
         print(f"note: {note}")

@@ -28,7 +28,8 @@ Legend: `[x]` shipped and verified · `[~]` partially shipped · `[ ]` not start
 - [ ] Coolify resources: Database + Application + domain + backup + Kuma
 - [x] CI: ruff, mypy, pytest, web typecheck/build, image build and container smoke test
 - [x] Dependabot for pip, npm, actions and the base image
-- [ ] SBOM and vulnerability scanning in CI
+- [x] Dependency audit (`pip-audit`) and static scan (`bandit`) in CI
+- [ ] SBOM generation and container image scanning
 
 **Done when:** `https://iptv.joxit.ru` serves a login page over TLS, `/healthz` is green in Uptime
 Kuma, the database backup has been restored once, and CI is green on `main`.
@@ -77,7 +78,7 @@ Kuma, the database backup has been restored once, and CI is green on `main`.
 - [x] Retention and idempotent full replace per source
 - [x] Channel mapping: exact `tvg_id` → normalised name; manual maps preserved
 - [x] Per-device `epg.xml` / `epg.xml.gz`, mapped ids emitted in the playlist
-- [ ] Smart-TV size cap (≤ 5 MB) and profile-aware window
+- [x] Smart-TV size cap: 7 → 3 → 1-day windows until the guide fits `IPTV_EPG_MAX_BYTES`
 - [ ] EPG management view + TV guide view in the UI
 - [ ] `iptv-org/epg` sidecar (optional, licence caveat)
 

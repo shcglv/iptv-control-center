@@ -45,7 +45,7 @@ Release notes and install steps: [`RELEASE.md`](../RELEASE.md).
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| FastAPI + SQLAlchemy async + Alembic | ✅ | migrations reach `198a8944b683` |
+| FastAPI + SQLAlchemy async + Alembic | ✅ | migrations reach `ec324056e4de` |
 | PostgreSQL in production | ✅ verified | the full 231-test suite passes against PostgreSQL 16 (`IPTV_TEST_DATABASE_URL`), CI runs it too |
 | Auth: Argon2id, TOTP, sessions, CSRF | ✅ | `test_auth.py` |
 | Secrets encrypted at rest, masked logs | ✅ | `test_secrets.py`, diagnostics log test |

@@ -122,8 +122,9 @@ Programmes are stored as UTC epoch seconds — unambiguous on SQLite and Postgre
 - A source is **fully replaced** on every import (programmes are deleted, then re-inserted), which
   makes re-import idempotent and applies retention in the same pass.
 - `DOCTYPE` is accepted, because real exports carry `<!DOCTYPE tv SYSTEM "xmltv.dtd">`. The DTD is
-  never fetched (`no_network=True`), entity amplification is limited by libxml2 (`huge_tree=False`)
-  and the document is capped at 50 MB, which covers the attack surface without rejecting guides.
+  never fetched (`no_network=True`), entity expansion is refused outright
+  (`resolve_entities=False`), and a document fetched from a URL is capped at 50 MB by the fetcher
+  while a directly supplied one may reach 512 MB.
 - Timestamps accept `+HHMM` or `+HH:MM`, with or without a space, `Z`, and truncated forms
   (`YYYYMMDD`, `YYYYMMDDhhmm`) which are padded; an unparseable timestamp skips that programme only.
 - A document decoded to `str` has its `encoding=…` declaration dropped before UTF-8 encoding, so a
