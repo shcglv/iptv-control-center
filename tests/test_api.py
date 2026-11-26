@@ -243,3 +243,29 @@ async def test_channel_sources_endpoint(client: httpx.AsyncClient) -> None:
 
     missing = await client.get("/api/v1/channels/pk-nope/sources", headers=ADMIN_HEADERS)
     assert missing.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_health_reports_503_when_the_database_is_unreachable(
+    client: httpx.AsyncClient,
+) -> None:
+    """A monitor judges by status code: 200 with 'degraded' would read as healthy."""
+    from iptvcc.api import app
+    from iptvcc.db import get_session
+
+    class BrokenSession:
+        async def execute(self, *args: object, **kwargs: object) -> object:
+            raise RuntimeError("database is gone")
+
+    async def broken_session():
+        yield BrokenSession()
+
+    app.dependency_overrides[get_session] = broken_session
+    try:
+        response = await client.get("/healthz")
+        assert response.status_code == 503
+        body = response.json()
+        assert body["status"] == "degraded"
+        assert body["database"] == "error"
+    finally:
+        app.dependency_overrides.pop(get_session, None)

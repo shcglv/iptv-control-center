@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] — 2026-11-26
+
+### Fixed
+
+- **`/healthz` answered 200 with a dead database.** It returned `{"status":"degraded"}` while the
+  HTTP status stayed 200, and every monitor judges by that code — Docker's HEALTHCHECK, Coolify's
+  container state, Uptime Kuma. The product could be unable to serve a single request while every
+  dashboard showed green. It now returns **503** when the database is unreachable, which is what the
+  healthcheck and the monitors already know how to read.
+- Verified end to end with a real PostgreSQL container: `/healthz` switched to 503 within five
+  seconds of the database stopping, and Docker marked the container `unhealthy` after three failed
+  checks (~70 s with a 30-second interval). That delay is deliberate: a transient blip does not
+  trigger a restart, a real outage does.
+
 ## [1.7.2] — 2026-11-26
 
 ### Fixed

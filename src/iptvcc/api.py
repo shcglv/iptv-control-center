@@ -348,17 +348,26 @@ class HealthOut(BaseModel):
 
 
 @app.get("/healthz", response_model=HealthOut, tags=["ops"])
-async def healthz(session: SessionDep) -> HealthOut:
+async def healthz(session: SessionDep) -> Response:
+    """Liveness plus database reachability.
+
+    A degraded database returns 503, not 200: Docker's HEALTHCHECK and any uptime monitor judge by
+    status code, and answering 200 with ``status: degraded`` tells them the product is fine while it
+    cannot serve a single request.
+    """
     database = "ok"
     try:
         await session.execute(text("SELECT 1"))
     except Exception:
         database = "error"
-    return HealthOut(
+    payload = HealthOut(
         status="ok" if database == "ok" else "degraded",
         version=__version__,
         database=database,
     )
+    if database != "ok":
+        return JSONResponse(status_code=503, content=payload.model_dump())
+    return JSONResponse(status_code=200, content=payload.model_dump())
 
 
 STATIC_DIR = Path(__file__).parent / "static"
