@@ -77,8 +77,8 @@ def edits(version: str) -> list[Edit]:
     ]
 
 
-def current_version() -> str:
-    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+def current_version(root: Path) -> str:
+    text = (root / "pyproject.toml").read_text(encoding="utf-8")
     match = re.search(r'(?m)^version = "([^"]+)"$', text)
     if match is None:
         raise SystemExit("pyproject.toml has no version line")
@@ -89,44 +89,50 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("version", help="new version, for example 1.8.0")
     parser.add_argument("--dry-run", action="store_true", help="show what would change")
+    parser.add_argument("--root", type=Path, default=ROOT, help="repository root to edit")
     args = parser.parse_args()
+    root: Path = args.root.resolve()
 
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.version):
         print(f"not a semantic version: {args.version}")
         return 2
-    before = current_version()
+    before = current_version(root)
     if before == args.version:
         print(f"already at {before}; nothing to do")
         return 0
 
     print(f"bumping {before} -> {args.version}")
-    pending: list[tuple[Edit, str, str]] = []
+
+    # Validate everything before writing anything: if one site disagrees, the release should stop
+    # rather than be half-applied.
     for edit in edits(args.version):
-        path = ROOT / edit.path
-        text = path.read_text(encoding="utf-8")
+        text = (root / edit.path).read_text(encoding="utf-8")
         match = re.search(edit.pattern, text)
         if match is None:
             print(f"  MISSING  {edit.path}: no match for {edit.description}")
             return 1
-        if match.group("version") not in {"", before} or (
-            "version" in match.groupdict() and match.group("version") != before
-        ):
-            print(
-                f"  ODD      {edit.path}: {edit.description} says "
-                f"{match.group('version')}, expected {before}"
-            )
+        found = match.groupdict().get("version")
+        if found is not None and found != before:
+            print(f"  ODD      {edit.path}: {edit.description} says {found}, expected {before}")
             return 1
-        updated = re.sub(edit.pattern, edit.replacement, text, count=1)
-        pending.append((edit, text, updated))
         print(f"  ok       {edit.path}: {edit.description}")
 
     if args.dry_run:
         print("dry run: nothing written")
         return 0
 
-    for edit, _text, updated in pending:
-        (ROOT / edit.path).write_text(updated, encoding="utf-8", newline="\n")
-    print(f"done: {len(pending)} place(s) updated")
+    # Apply one at a time, re-reading after each write. RELEASE.md has two edits, and computing both
+    # from the same original text made the second write discard the first.
+    for edit in edits(args.version):
+        path = root / edit.path
+        text = path.read_text(encoding="utf-8")
+        updated = re.sub(edit.pattern, edit.replacement, text, count=1)
+        if updated == text:
+            print(f"  NOOP     {edit.path}: {edit.description} changed nothing")
+            return 1
+        path.write_text(updated, encoding="utf-8", newline="\n")
+
+    print(f"done: {len(edits(args.version))} place(s) updated")
     return 0
 
 

@@ -4,6 +4,35 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.8] — 2026-11-26
+
+Verification and release tooling. No product behaviour changed.
+
+### Added
+
+- `scripts/verify_write_abort.py` proves on a **real uvicorn server** what the in-process test
+  transport cannot: with the default dependency scope a failing commit still delivered `200`, with
+  `scope="function"` it delivered `500`, and a profile write whose commit fails delivered `500`. It is
+  part of `verify_all.py`.
+- `scripts/bump_version.py` replaces the blanket text replace used for every earlier release. It
+  edits exactly the places that state the current version, refuses when they disagree, and never
+  rewrites another version number or a measured count. Ten tests pin that down, including a dry run
+  whose target files must stay byte-identical.
+
+### Fixed
+
+- **The version tool itself had a bug, found while cutting this release.** Two edits to `RELEASE.md`
+  were both computed from the original text, so the second write discarded the first: the title kept
+  the old version while the bullet moved. Edits are now applied one at a time with a re-read, and a
+  test runs a real bump on a temporary copy of the seven files and asserts every site moved — plus
+  that a seeded historical line survives untouched.
+- **The verification report had been rewriting its own history.** A blanket version replace had
+  relabelled a re-acceptance section measured at 1.7.0 as "1.7.7", rewritten its 272 tests as 277,
+  and dropped the original counts from the `72f980c` matrix. Historical figures are restored and each
+  run now has its own section.
+- The documentation checker compares test counts only against the **Summary** section, because it had
+  been comparing historical runs and drill tables with today's collection.
+
 ## [1.7.7] — 2026-11-26
 
 ### Changed
