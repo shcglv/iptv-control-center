@@ -149,7 +149,8 @@ typecheck and build; then an image build with a container smoke test.
 .\scripts\check.ps1 -PnpmPath C:\path\to\pnpm.cjs   # when pnpm is not on PATH
 ```
 
-A missing `pnpm` fails the gate with a message rather than quietly skipping the web steps.
+A missing `pnpm` fails the gate with a message rather than quietly skipping the web steps. The summary
+lists skipped steps explicitly and the verdict counts them, e.g. `GATES PASSED (6 passed, 2 skipped)`.
 
 Manual equivalents:
 

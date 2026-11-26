@@ -50,15 +50,24 @@ Invoke-Step "mypy" { & $python -m mypy src }
 
 if (-not $Fast) {
     Invoke-Step "pytest" { & $python -m pytest -q }
-
-    if ($Browser) {
-        $env:IPTV_BROWSER_TESTS = "1"
-        Invoke-Step "pytest (browser)" { & $python -m pytest tests/test_browser.py -q }
-        Remove-Item Env:\IPTV_BROWSER_TESTS -ErrorAction SilentlyContinue
-    }
+}
+else {
+    $script:results += [pscustomobject]@{ Step = "pytest"; Result = "skipped (-Fast)" }
 }
 
-if (-not $SkipWeb) {
+if ($Browser) {
+    $env:IPTV_BROWSER_TESTS = "1"
+    Invoke-Step "pytest (browser)" { & $python -m pytest tests/test_browser.py -q }
+    Remove-Item Env:\IPTV_BROWSER_TESTS -ErrorAction SilentlyContinue
+}
+else {
+    $script:results += [pscustomobject]@{ Step = "pytest (browser)"; Result = "skipped (-Browser not given)" }
+}
+
+if ($SkipWeb) {
+    $script:results += [pscustomobject]@{ Step = "web typecheck + build"; Result = "skipped (-SkipWeb)" }
+}
+else {
     # A skipped step must never look like a passing one: without pnpm the gate fails and says why,
     # instead of silently dropping the web checks from a run that then reports all-green.
     $pnpm = if ($PnpmPath) { $PnpmPath } else { (Get-Command pnpm -ErrorAction SilentlyContinue).Source }
@@ -84,10 +93,13 @@ Invoke-Step "specification invariants" { & $python scripts\check_spec.py }
 
 Write-Host ""
 $script:results | Format-Table -AutoSize | Out-String | Write-Host
-$failed = @($script:results | Where-Object { $_.Result -ne "pass" })
+$failed = @($script:results | Where-Object { $_.Result -like "FAIL*" })
+$skipped = @($script:results | Where-Object { $_.Result -like "skipped*" })
+$passed = @($script:results | Where-Object { $_.Result -eq "pass" })
 if ($failed.Count -gt 0) {
     Write-Host "GATES FAILED: $($failed.Count) of $($script:results.Count) step(s)" -ForegroundColor Red
     exit 1
 }
-Write-Host "GATES PASSED ($($script:results.Count) steps)" -ForegroundColor Green
+# Skips are reported in the table above, so the verdict can be green - but it always says how many.
+Write-Host "GATES PASSED ($($passed.Count) passed, $($skipped.Count) skipped)" -ForegroundColor Green
 exit 0
