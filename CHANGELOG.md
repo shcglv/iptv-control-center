@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.4] — 2026-11-26
+
+### Fixed
+
+- **A single malformed Telegram update could stall the bot.** `poll_once` advanced its offset
+  *outside* the per-update `try`, so an update without a numeric `update_id` — or a non-dict element
+  in the batch — escaped and the poller re-fetched the same batch forever: the bot would answer
+  nothing and log the same error every five seconds. The offset now advances defensively and the
+  handler ignores junk instead of raising.
+- Non-numeric chat ids no longer produce an exception; such an update is simply skipped.
+
+### Notes
+
+- Robustness, not an exploitable hole: the real Bot API always sends a numeric `update_id`. The
+  wedge needed a malformed payload, which is why this is a defence-in-depth fix rather than a
+  vulnerability report. It is still the difference between a noisy log line and a silent outage.
+
 ## [1.6.3] — 2026-11-26
 
 ### Fixed

@@ -296,3 +296,35 @@ async def test_no_chats_means_no_delivery(
         stats = await run_notification_scan(session, _client(fake_api), dedupe_hours=6)
         await session.commit()
     assert stats == {"sent": 0, "recovered": 0, "chats": 0}
+
+
+@pytest.mark.asyncio
+async def test_malformed_updates_do_not_wedge_the_poller(
+    session_factory: async_sessionmaker[AsyncSession], fake_api: FakeApi
+) -> None:
+    """One bad element must not stop the offset from advancing, or the bot loops on it forever."""
+    await _seed(session_factory)
+    fake_api.updates = [
+        [
+            None,
+            {"update_id": "not-a-number"},
+            {"update_id": 41, "message": None},
+            {"update_id": 42, "message": {"chat": {"id": "nope"}, "text": "/status"}},
+            {"update_id": 43, "message": {"chat": {}, "text": "/status"}},
+        ]
+    ]
+    bot = _bot(fake_api, session_factory, allow={OWNER})
+
+    assert await bot.poll_once() == 5
+    # The last well-formed update id advanced the offset past the whole batch.
+    assert bot._offset == 44
+
+
+@pytest.mark.asyncio
+async def test_handle_update_ignores_junk(
+    session_factory: async_sessionmaker[AsyncSession], fake_api: FakeApi
+) -> None:
+    bot = _bot(fake_api, session_factory, allow={OWNER})
+    assert await bot.handle_update(None) is None
+    assert await bot.handle_update({"message": "not-a-dict"}) is None
+    assert await bot.handle_update({"message": {"text": "hello"}}) is None

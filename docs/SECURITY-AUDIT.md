@@ -102,6 +102,21 @@ is admin-triggered.
 all eleven M3U tests pass unchanged, and a regression test asserts both the time bound and that a
 valid entry after the hostile line still survives.
 
+## Sixth finding: a malformed update could stall the Telegram bot
+
+`poll_once` computed the next offset *before* entering its per-update `try`. An update without a
+numeric `update_id`, or a non-dictionary element in the batch, raised outside the guard; the outer
+loop caught it, slept five seconds, and re-fetched the same batch — forever. The bot would answer
+nothing while the log filled with the same error.
+
+The offset now advances defensively (a bad id does not block the others), the handler ignores
+non-dictionaries, and a chat id that is not a number is skipped rather than raised on. Two tests
+cover it: one batch mixing five malformed shapes, and three junk inputs to `handle_update`.
+
+Honest severity: the real Bot API always sends a numeric `update_id`, so this needed a malformed
+payload. It is robustness hardening, not an exploitable hole — but the failure mode was a silent
+outage of the alerting channel, which matters more than the likeliness suggests.
+
 ## What this does not prove
 
 - **Container OS packages** are not scanned. A production image should also be scanned (Trivy or

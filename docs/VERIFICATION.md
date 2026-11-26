@@ -1,7 +1,7 @@
 # Verification report
 
 **Date:** 2026-11-26
-**Version:** 1.6.3 (tagged `v1.6.3`)
+**Version:** 1.6.4 (tagged `v1.6.4`)
 **Environment:** Windows development machine, Python 3.12.0, Docker 29.9.3, Chromium via Playwright
 **Database under test:** SQLite **and PostgreSQL 16** — the full suite passes on both
 
@@ -22,7 +22,7 @@ verified is listed at the end, and mapped against the specification in [`STATUS.
 | Real public data | `pytest tests/test_real_world.py` (`IPTV_NETWORK_TESTS=1`) | **3 passed** — 1 059-entry public playlist imported to 1 028 channels; 7/12 real streams reachable; 3 channels resolved to real HLS URLs (`HEAD` 200). Details: [`REAL-WORLD.md`](REAL-WORLD.md) |
 | Real EPG + active probe | `data/live_real_epg.py`, ffprobe in the ffmpeg image | 20.9 MiB public guide → 287 channels / 48 814 programmes; ffprobe read a real HLS stream (1280×720 h264) and correctly failed a zero-stream manifest |
 | Real decoder through the 302 | `scripts/verify_decoder.py` | **PASSED** — ffmpeg in a container followed our resolver's 302 to a public HLS stream and decoded 3 s (exit 0, no errors) |
-| Panel checks in the container | `scripts/verify_panel.py` | **PASSED** — 8/8 `ok` in a production-shaped container (`app_env=production`, HTTPS base URL), migrations `ec324056e4de`, version 1.6.3 |
+| Panel checks in the container | `scripts/verify_panel.py` | **PASSED** — 8/8 `ok` in a production-shaped container (`app_env=production`, HTTPS base URL), migrations `ec324056e4de`, version 1.6.4 |
 | Restore (SQLite) | `data/live_restore_drill.py` | **PASSED** |
 | Preflight | `scripts/preflight.py` | 8/8 with a valid key; fails correctly without one |
 | Performance | `scripts/bench_scale.py --channels 3000 ...` | import 1.78 s, render 0.34 s, EPG 12.4 s, guide 4.5 s |

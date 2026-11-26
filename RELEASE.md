@@ -1,8 +1,8 @@
-# Release 1.6.3
+# Release 1.6.4
 
 Verified end to end as an artifact: backend on both databases, browser, container, both backup drills, a real public playlist and guide, a real decoder through the 302, and the panel's own preflight inside the image. **It has not been deployed anywhere yet** — that is step 10.
 
-- Version: `1.6.3`
+- Version: `1.6.4`
 - Image: built from this commit, 367 MB default
 - Evidence: [`docs/VERIFICATION.md`](docs/VERIFICATION.md) · status:
   [`docs/STATUS.md`](docs/STATUS.md)

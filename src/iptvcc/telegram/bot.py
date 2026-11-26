@@ -123,7 +123,15 @@ class TelegramBot:
     async def poll_once(self) -> int:
         updates = await self._client.get_updates(self._offset, self._poll_timeout)
         for update in updates:
-            self._offset = int(update.get("update_id", 0)) + 1
+            # The offset must advance even for an update we cannot handle, or one malformed element
+            # wedges the poller: it re-fetches the same batch forever and never moves on.
+            if isinstance(update, dict):
+                try:
+                    update_id = int(update.get("update_id") or 0)
+                except (TypeError, ValueError):
+                    update_id = 0
+                if update_id:
+                    self._offset = update_id + 1
             try:
                 handled = await self.handle_update(update)
             except Exception:
@@ -139,25 +147,35 @@ class TelegramBot:
         return len(updates)
 
     async def handle_update(self, update: dict[str, Any]) -> tuple[int, str] | None:
+        if not isinstance(update, dict):
+            return None
         message = update.get("message") or {}
+        if not isinstance(message, dict):
+            return None
         chat_id = (message.get("chat") or {}).get("id")
         text = (message.get("text") or "").strip()
         sender = message.get("from") or {}
         if not chat_id or not text.startswith("/"):
             return None
+        try:
+            chat_id = int(chat_id)
+            sender_id = int(sender.get("id", chat_id))
+        except (TypeError, ValueError):
+            # A chat id that is not a number cannot be replied to.
+            return None
 
         async with self._factory() as session:
             if not await self._allowed(
-                session, int(sender.get("id", chat_id)), sender.get("username")
+                session, sender_id, sender.get("username")
             ):
                 await session.commit()
-                return int(chat_id), "Нет доступа. Этот чат не в списке разрешённых."
+                return chat_id, "Нет доступа. Этот чат не в списке разрешённых."
 
             command, _, argument = text.partition(" ")
             command = command.split("@", 1)[0].lower()
             reply = await self.dispatch(command, argument.strip(), session)
             await session.commit()
-        return int(chat_id), _clip(reply)
+        return chat_id, _clip(reply)
 
     async def _allowed(self, session: AsyncSession, user_id: int, username: str | None) -> bool:
         if self._allow_ids is not None:
