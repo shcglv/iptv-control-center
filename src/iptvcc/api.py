@@ -131,6 +131,33 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await dispose_engine()
 
 
+class BodyLimitMiddleware(BaseHTTPMiddleware):
+    """Refuse oversized request bodies before they are buffered.
+
+    Imports arrive as JSON, so a declared ``Content-Length`` is enough to reject a hostile or
+    accidental upload without reading it. A chunked request without a length is not covered here —
+    the authenticated import paths enforce their own limits on the decoded string.
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
+        limit = get_settings().max_request_bytes
+        declared = request.headers.get("content-length")
+        if declared is not None and limit > 0:
+            try:
+                length = int(declared)
+            except ValueError:
+                length = 0
+            if length > limit:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": f"request body is {length} bytes; the limit is {limit}"
+                    },
+                )
+        response: Response = await call_next(request)
+        return response
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Apply browser-hardening headers to every response.
 
@@ -167,6 +194,7 @@ app = FastAPI(
 configure_logging()
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(BodyLimitMiddleware)
 
 
 # --- admin auth --------------------------------------------------------------------------------
@@ -370,6 +398,9 @@ async def import_source(
         raise HTTPException(status_code=404, detail="source not found")
     if not payload.m3u and not payload.url:
         raise HTTPException(status_code=422, detail="provide either 'm3u' or 'url'")
+    # Content-Length can be omitted with a chunked upload, so the decoded payload is checked too.
+    if payload.m3u and len(payload.m3u) > get_settings().max_request_bytes:
+        raise HTTPException(status_code=413, detail="playlist is larger than the request limit")
 
     try:
         body = payload.m3u if payload.m3u else await fetch_text(payload.url or "")
@@ -637,6 +668,8 @@ async def import_epg(
         raise HTTPException(status_code=404, detail="EPG source not found")
     if not payload.xml and not payload.url:
         raise HTTPException(status_code=422, detail="provide either 'xml' or 'url'")
+    if payload.xml and len(payload.xml) > get_settings().max_request_bytes:
+        raise HTTPException(status_code=413, detail="guide is larger than the request limit")
 
     try:
         if payload.xml:

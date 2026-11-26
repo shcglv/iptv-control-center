@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] — 2026-11-26
+
+### Security
+
+- **Request bodies have a size limit.** Imports arrive as JSON, and nothing stopped a client from
+  streaming hundreds of megabytes into the process. `IPTV_MAX_REQUEST_BYTES` (64 MB default) is
+  enforced by middleware from `Content-Length` before the body is buffered, and the two import
+  handlers re-check the decoded string so a chunked upload without a length cannot bypass it.
+- An oversized upload now returns `413` with the actual size, instead of consuming memory until the
+  process is killed.
+
+### Audited and found already sound
+
+- Discovery fetches pages and feeds through the guarded client with an 8 MB cap.
+- The RSS/Atom parser already used `resolve_entities=False` and `no_network=True`.
+- Login is throttled per client key, and the session cookie is `HttpOnly`, `SameSite=Lax`, and
+  `Secure` whenever the base URL is HTTPS.
+
 ## [1.6.1] — 2026-11-26
 
 ### Security

@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     # in production, where the schema is not something an unauthenticated visitor should read.
     enable_docs: bool | None = None
 
+    # Requests larger than this are refused before the body is buffered. Playlists and guides are
+    # uploaded as JSON, and 50 MB of playlist is already far beyond a realistic provider export.
+    max_request_bytes: int = 64 * 1024 * 1024
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() in {"production", "prod"}

@@ -68,6 +68,20 @@ Two changes:
 Measured on a six-level bomb: 6 characters and a clean refusal with resolution off, versus 3000
 characters at four levels (10⁶ at six) with it on.
 
+## Fourth finding: unbounded request bodies
+
+Playlists and guides are uploaded as JSON strings. Nothing limited their size, so an authenticated
+client — or a compromised session — could stream hundreds of megabytes into the process and watch it
+be buffered.
+
+`IPTV_MAX_REQUEST_BYTES` (64 MB) is now enforced twice: middleware rejects a declared
+`Content-Length` above the limit with `413` before the body is read, and both import handlers check
+the decoded string, which covers a chunked upload that declares no length at all.
+
+Audited alongside it and already sound: discovery fetches through the guarded client with an 8 MB
+cap, the RSS parser already disabled entity resolution and network access, and login already
+throttles per client key.
+
 ## What this does not prove
 
 - **Container OS packages** are not scanned. A production image should also be scanned (Trivy or

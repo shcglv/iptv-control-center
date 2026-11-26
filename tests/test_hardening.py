@@ -137,3 +137,27 @@ async def test_docs_are_served_outside_production(anon_client: httpx.AsyncClient
     # The test app runs with app_env=test, so the schema is available for developers.
     assert (await anon_client.get("/docs")).status_code == 200
     assert (await anon_client.get("/openapi.json")).status_code == 200
+
+
+# --- request body limits -----------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_oversized_body_is_refused_before_it_is_read(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(get_settings(), "max_request_bytes", 1024, raising=False)
+    response = await client.post(
+        "/api/v1/sources/1/import", json={"m3u": "x" * 4096}, headers=ADMIN_HEADERS
+    )
+    assert response.status_code == 413
+    assert "limit" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_a_small_body_reaches_the_handler(client: httpx.AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/sources/999/import", json={"m3u": "#EXTM3U"}, headers=ADMIN_HEADERS
+    )
+    # Unknown source is a 404 from the handler; the point is that it was not refused as oversized.
+    assert response.status_code != 413
