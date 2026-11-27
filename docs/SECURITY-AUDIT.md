@@ -123,5 +123,5 @@ outage of the alerting channel, which matters more than the likeliness suggests.
   Grype) and rebuilt on a schedule; that work is listed as absent in `STATUS.md`.
 - No SBOM is produced yet.
 - No dynamic or DAST scanning has been performed against a running instance.
-- The audit says nothing about the application's logic — that is what the 299 tests, the SSRF suite
+- The audit says nothing about the application's logic — that is what the 300 tests, the SSRF suite
   and the browser/container acceptance runs are for.

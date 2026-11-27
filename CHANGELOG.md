@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.17] — 2026-11-27
+
+### Fixed
+
+- **A rotated device appeared twice in the list.** `/api/v1/devices` joined every assignment row,
+  including the ones revoked by rotation, so one rotation produced two entries. The query now filters
+  to the active assignment; a test rotates a token and asserts a single row.
 ## [1.7.16] — 2026-11-27
 
 ### Added

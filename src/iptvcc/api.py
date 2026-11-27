@@ -635,6 +635,9 @@ async def list_devices(session: SessionDep, _: AdminDep) -> list[DeviceOut]:
         await session.execute(
             select(Device, Assignment)
             .join(Assignment, Assignment.device_id == Device.id)
+            # Rotating a token revokes the old assignment; without this filter every rotation added
+            # another row and the same device appeared twice in the panel.
+            .where(Assignment.revoked_at.is_(None))
             .order_by(Device.created_at)
         )
     ).all()

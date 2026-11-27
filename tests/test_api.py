@@ -370,3 +370,22 @@ async def test_a_device_can_be_renamed_moved_and_deleted(client: httpx.AsyncClie
     # The token no longer resolves, and the endpoint reports the playlist as absent rather than as a
     # permission problem: that reveals nothing about whether the token ever existed.
     assert playlist_after.status_code in {401, 404}
+
+
+@pytest.mark.asyncio
+async def test_rotating_a_token_does_not_duplicate_the_device(client: httpx.AsyncClient) -> None:
+    """The list joined every assignment, so a rotated device appeared twice."""
+    created = (
+        await client.post(
+            "/api/v1/devices",
+            json={"name": "Rotated TV", "kind": "android_tv"},
+            headers=ADMIN_HEADERS,
+        )
+    ).json()
+    rotated = await client.post(f"/api/v1/devices/{created['id']}/rotate", headers=ADMIN_HEADERS)
+    assert rotated.status_code == 200
+
+    devices = (await client.get("/api/v1/devices", headers=ADMIN_HEADERS)).json()
+    matches = [row for row in devices if row["id"] == created["id"]]
+    assert len(matches) == 1, matches
+    assert matches[0]["name"] == "Rotated TV"
