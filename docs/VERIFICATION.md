@@ -50,6 +50,7 @@ observed, in the order it happened:
 | Panel self-check (`/api/v1/system/check`) | **8/8 ok** — encryption key, base URL, timezone, telegram, rate limit, artifacts dir, database, migrations |
 | `scripts/smoke_public.py --base https://iptv.joxit.ru` | **SMOKE PASSED** (5 checks: healthz, login page, assets, security headers, TLS 89 days) |
 | Real provider playlist imported by URL | **4 097 streams parsed**, **3 420 channels** created and linked |
+| Bulk import of the owner's 25 links (12 GitHub playlists included) | **17 sources ok → 5 918 channels**; 8 rejected by the provider itself (404/403/empty), each with a readable reason after 1.7.12 |
 | Device playlist | 784 KiB, 3 420 `#EXTINF` entries |
 | Resolver | `302` to the provider's HLS URL |
 | CI on GitHub | **green** for the first time — web, backend, PostgreSQL, audit, image build + acceptance |
