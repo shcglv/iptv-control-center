@@ -175,7 +175,14 @@ export default function Channels() {
                         <td>{stream.source}</td>
                         <td className="mono">{stream.container}</td>
                         <td className="num">{stream.score.toFixed(1)}</td>
-                        <td className="num">{Math.round(stream.uptime_ratio * 100)}%</td>
+                        <td className="num">
+                        {Math.round(stream.uptime_ratio * 100)}%
+                        {stream.uptime_ratio === 0 && stream.last_error_class ? (
+                          <div className="muted" style={{ fontSize: 11 }}>
+                            {stream.last_error_class}
+                          </div>
+                        ) : null}
+                      </td>
                         <td className="muted">
                           {stream.reasons.length ? stream.reasons.join("; ") : "подходит"}
                         </td>

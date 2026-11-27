@@ -127,6 +127,7 @@ export interface StreamHealth {
   score: number;
   uptime_ratio: number;
   checks: number;
+  last_error_class: string | null;
   failures: number;
   p90_ttfb_ms: number | null;
   resolution: string | null;
@@ -203,6 +204,7 @@ export interface ChannelSource {
   container: string;
   score: number;
   uptime_ratio: number;
+  last_error_class: string | null;
   resolution: string | null;
 }
 
@@ -406,6 +408,7 @@ export interface DiagnosedStream {
   score: number;
   uptime_ratio: number;
   checks: number;
+  last_error_class: string | null;
   resolution: string | null;
   eligible: Record<string, boolean>;
   reasons: string[];

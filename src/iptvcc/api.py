@@ -347,6 +347,7 @@ class ChannelSourceOut(BaseModel):
     container: str
     score: float
     uptime_ratio: float
+    last_error_class: str | None = None
     resolution: str | None
 
 
@@ -554,6 +555,7 @@ async def channel_sources(
                 container=stream.container,
                 score=candidate.score,
                 uptime_ratio=quality.uptime_ratio if quality else 0.0,
+                last_error_class=quality.last_error_class if quality else None,
                 resolution=quality.resolution if quality else None,
             )
         )
@@ -1409,6 +1411,7 @@ class DiagnosedStreamOut(BaseModel):
     score: float
     uptime_ratio: float
     checks: int
+    last_error_class: str | None = None
     resolution: str | None
     eligible: dict[str, bool]
     reasons: list[str]
@@ -1529,6 +1532,7 @@ async def diagnose_channel(public_key: str, session: SessionDep, _: AdminDep) ->
                 score=round(score, 2),
                 uptime_ratio=quality.uptime_ratio if quality else 0.0,
                 checks=quality.checks if quality else 0,
+                last_error_class=quality.last_error_class if quality else None,
                 resolution=quality.resolution if quality else None,
                 eligible=eligible,
                 reasons=reasons,

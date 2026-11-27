@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.14] — 2026-11-27
+
+### Changed
+
+- **The panel now says *why* a stream has no uptime.** Every stream in the deployed catalog showed
+  `0%`, which reads like a broken channel. In fact the probe had recorded `http_401`: the providers
+  refuse the server's requests while a player at home may still work. The channel table and the
+  diagnose payload now carry `last_error_class`, so the number comes with its reason.
+
+### Notes
+
+- Probing three of the imported providers from the server currently fails at connect time at all
+  (`ConnectError`), and the `loganettv/playlists` files are links to a Telegram channel rather than
+  playlists. Uptime is therefore only meaningful for the sources whose streams actually answer.
 ## [1.7.13] — 2026-11-27
 
 ### Added
