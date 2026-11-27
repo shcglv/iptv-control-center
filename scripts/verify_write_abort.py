@@ -52,15 +52,22 @@ FAILURES: list[str] = []
 
 
 def serve(application: FastAPI, port: int) -> uvicorn.Server:
-    server = uvicorn.Server(
-        uvicorn.Config(application, host="127.0.0.1", port=port, log_level="error")
-    )
-    threading.Thread(target=server.run, daemon=True).start()
-    for _ in range(100):
-        if server.started:
-            break
-        time.sleep(0.1)
-    return server
+    """Start a server and confirm it is listening.
+
+    A port left in TIME_WAIT makes the bind fail, and without this check the drill then reported a
+    verification failure against a server that never existed. Two attempts, then a clear error.
+    """
+    for attempt in range(2):
+        server = uvicorn.Server(
+            uvicorn.Config(application, host="127.0.0.1", port=port, log_level="error")
+        )
+        threading.Thread(target=server.run, daemon=True).start()
+        for _ in range(150):
+            if server.started:
+                return server
+            time.sleep(0.1)
+        time.sleep(2 + attempt * 2)
+    raise SystemExit(f"could not bind 127.0.0.1:{port}; a previous server may still hold it")
 
 
 def comparison_app() -> FastAPI:
@@ -116,14 +123,16 @@ async def main() -> int:
     server = serve(plain, 18087)
     try:
         client = httpx.Client(base_url="http://127.0.0.1:18087", trust_env=False, timeout=10)
+        # A dependency that raises after the response can reset the connection on Windows instead of
+        # returning 500; attempt() reports that as "no success", which is what the check asserts.
         check(
             "dependency ends after the response",
-            client.get("/after").status_code,
+            attempt(client, "GET", "/after"),
             expect_error=False,
         )
         check(
             "dependency ends before the response",
-            client.get("/before").status_code,
+            attempt(client, "GET", "/before"),
             expect_error=True,
         )
     finally:

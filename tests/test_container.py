@@ -21,6 +21,7 @@ import socket
 import subprocess
 import time
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -47,14 +48,26 @@ M3U = (
     '#EXTINF:-1 group-title="Sport",Eurosport 1\nhttp://provider.test/euro.ts\n'
 )
 
-XMLTV = """<?xml version="1.0" encoding="UTF-8"?>
-<tv>
-  <channel id="bbc1.uk"><display-name>BBC One HD</display-name></channel>
-  <programme start="20261125180000 +0000" stop="20261125190000 +0000" channel="bbc1.uk">
-    <title>Evening News</title>
-  </programme>
-</tv>
-"""
+
+def _xmltv() -> str:
+    """A guide dated relative to now.
+
+    The timestamps used to be hardcoded, which made this test a time bomb: once the date fell out of
+    the guide window (one day back, seven forward), the programme vanished from the rendered guide
+    and the test failed for a reason that had nothing to do with the code.
+    """
+    start = (datetime.now(UTC) + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+    stop = start + timedelta(hours=1)
+    stamp = lambda moment: moment.strftime("%Y%m%d%H%M%S +0000")  # noqa: E731
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n<tv>\n'
+        '  <channel id="bbc1.uk"><display-name>BBC One HD</display-name></channel>\n'
+        f'  <programme start="{stamp(start)}" stop="{stamp(stop)}" channel="bbc1.uk">\n'
+        "    <title>Evening News</title>\n"
+        "  </programme>\n"
+        "</tv>\n"
+    )
+
 
 FEED = """<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>Forum</title>
@@ -287,7 +300,7 @@ def test_full_flow_and_persistence(
     ).json()
     assert (
         client.post(
-            f"/api/v1/epg/sources/{epg['id']}/import", json={"xml": XMLTV}, headers=headers
+            f"/api/v1/epg/sources/{epg['id']}/import", json={"xml": _xmltv()}, headers=headers
         ).status_code
         == 200
     )

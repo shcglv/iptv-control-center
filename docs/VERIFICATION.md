@@ -38,6 +38,28 @@ inherited from the 1.6.6 run:
 | Container acceptance, image built from `v1.7.0` | **3 passed**, 39 s |
 | Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
 
+## Re-acceptance at `839e78d` (1.7.10)
+
+The playlist cache and the write-invalidation middleware changed delivery and the API, so the gate ran
+again on that commit:
+
+| Check | Result |
+|---|---|
+| Backend, PostgreSQL 16 | **293 passed**, 16 skipped, 355 s |
+| Container acceptance, image built from `839e78d` | **3 passed**, 50 s |
+| Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
+| Drill matrix (`verify_all.py --skip-network`) | **9 passed**, 2 skipped: docs, spec, scheduler, telegram, write-abort, panel, upgrade, restore, postgres-container |
+
+Two things had to be fixed to get here, and neither was the cache:
+
+- **A dated test fixture.** The container test's XMLTV used the literal timestamp `20261125180000`;
+  once that fell outside the guide window (one day back, seven forward) the programme vanished from
+  the rendered guide. It is generated relative to now.
+- **A flaky drill.** `verify_write_abort.py` issued its comparison requests without tolerating a
+  connection reset — Windows sometimes resets instead of returning `500` — and crashed under the
+  runner while passing standalone. Both requests now go through the tolerant helper, and the runner
+  prints the tail of a failing drill so the next such failure explains itself.
+
 ## Drill matrix at `2f5a5e7` (1.7.9)
 
 `ruff format` had touched four product files, so the drills — not just the suites — were re-run on

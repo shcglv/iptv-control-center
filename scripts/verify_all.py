@@ -122,13 +122,20 @@ def main() -> int:
         status = "passed" if completed.returncode == 0 else "FAILED"
         results.append((drill.name, status, elapsed))
 
+        combined = (completed.stdout + completed.stderr).splitlines()
         tail = [
             line
-            for line in (completed.stdout + completed.stderr).splitlines()
+            for line in combined
             if line.startswith("RESULT:") or "FAILED" in line or "Traceback" in line
         ]
         for line in tail[-4:]:
             print(f"   {line.strip()}")
+        if status != "passed":
+            # A failing drill must explain itself: the matching lines above say nothing about a
+            # crash, which is exactly when a tail is needed.
+            print("   --- last lines of output ---")
+            for line in combined[-25:]:
+                print(f"   {line[:200]}")
         print(f"   {status} in {elapsed:.1f}s")
 
     print("\n| drill | result | time |")
