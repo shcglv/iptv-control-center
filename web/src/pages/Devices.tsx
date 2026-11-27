@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { ApiError, createDevice, listDevices, listProfiles, rotateDevice } from "../api";
+import { ApiError, createDevice, deleteDevice, listDevices, listProfiles, rotateDevice, updateDevice } from "../api";
 import type { DeviceWithToken } from "../api";
 import { Card, ErrorBanner, Loading, formatIso, useAsync } from "../components";
 
@@ -46,6 +46,48 @@ export default function Devices() {
       setReload((value) => value + 1);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Не удалось выполнить ротацию");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rename = async (id: string, current: string) => {
+    const next = window.prompt("Новое название устройства", current)?.trim();
+    if (!next || next === current) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await updateDevice(id, { name: next });
+      setReload((value) => value + 1);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Не удалось переименовать");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const moveToProfile = async (id: string, profile: number) => {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await updateDevice(id, { profile_id: profile });
+      setReload((value) => value + 1);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Не удалось сменить профиль");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: string, label: string) => {
+    if (!window.confirm(`Удалить устройство «${label}»? Его ссылка перестанет работать.`)) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await deleteDevice(id);
+      setReload((value) => value + 1);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Не удалось удалить устройство");
     } finally {
       setBusy(false);
     }
@@ -114,9 +156,39 @@ export default function Devices() {
                   <td className="mono muted">{device.token_prefix}…</td>
                   <td className="muted">{formatIso(device.created_at)}</td>
                   <td>
-                    <button className="btn btn-sm" onClick={() => rotate(device.id)} disabled={busy}>
-                      Ротация
-                    </button>
+                    <div className="row" style={{ gap: 6 }}>
+                      <button className="btn btn-sm" onClick={() => rotate(device.id)} disabled={busy}>
+                        Ротация
+                      </button>
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => rename(device.id, device.name)}
+                        disabled={busy}
+                      >
+                        Переименовать
+                      </button>
+                      <select
+                        className="select"
+                        style={{ width: 150 }}
+                        value={device.profile_id ?? ""}
+                        onChange={(event) => moveToProfile(device.id, Number(event.target.value))}
+                        disabled={busy}
+                        title="Профиль"
+                      >
+                        {(data?.profiles ?? []).map((profile) => (
+                          <option key={profile.id} value={profile.id}>
+                            {profile.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn btn-sm btn-danger"
+                        onClick={() => remove(device.id, device.name)}
+                        disabled={busy}
+                      >
+                        Удалить
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

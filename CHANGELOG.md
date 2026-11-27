@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.16] — 2026-11-27
+
+### Added
+
+- **Devices can be renamed, moved to another profile and deleted.** Until now a device was create-only:
+  its name and profile were fixed at creation, there was no delete at all, and a test device stayed in
+  the list forever. `PATCH /api/v1/devices/{id}` accepts `name`, `kind` and `profile_id`;
+  `DELETE /api/v1/devices/{id}` removes the device and its assignments, so the old playlist link stops
+  working. The panel shows a profile selector, a rename button and a delete button with confirmation.
+- `DeviceOut` now carries `profile_id`, which the panel needs to show the current profile.
 ## [1.7.15] — 2026-11-27
 
 ### Changed

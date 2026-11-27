@@ -80,6 +80,7 @@ export interface DeviceOut {
   id: string;
   name: string;
   kind: string;
+  profile_id: number;
   token_prefix: string;
   m3u_path: string;
   created_at: string;
@@ -183,6 +184,15 @@ export const createDevice = (name: string, kind: string, profileId?: number): Pr
 
 export const rotateDevice = (id: string): Promise<DeviceWithToken> =>
   request<DeviceWithToken>(`/api/v1/devices/${id}/rotate`, { method: "POST" });
+
+export const updateDevice = (
+  id: string,
+  patch: { name?: string; kind?: string; profile_id?: number },
+): Promise<DeviceOut> =>
+  request<DeviceOut>(`/api/v1/devices/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+
+export const deleteDevice = (id: string): Promise<void> =>
+  request<void>(`/api/v1/devices/${id}`, { method: "DELETE" });
 
 export const listProfiles = (): Promise<ProfileOut[]> => request<ProfileOut[]>("/api/v1/profiles");
 

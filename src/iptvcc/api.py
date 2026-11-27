@@ -15,7 +15,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -361,6 +361,7 @@ class DeviceOut(BaseModel):
     id: str
     name: str
     kind: str
+    profile_id: int
     token_prefix: str
     m3u_path: str
     created_at: datetime
@@ -583,6 +584,49 @@ async def create_device(payload: DeviceCreate, session: SessionDep, _: AdminDep)
     await session.flush()
     out = _device_out(device, assignment)
     return DeviceWithToken(**out.model_dump(), token=token)
+
+
+class DeviceUpdate(BaseModel):
+    """Rename a device, change how it is treated, or move it to another playlist profile."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    kind: str | None = None
+    profile_id: int | None = None
+
+
+@app.patch("/api/v1/devices/{device_id}", response_model=DeviceOut, tags=["devices"])
+async def update_device(
+    device_id: str, payload: DeviceUpdate, session: SessionDep, _: AdminDep
+) -> DeviceOut:
+    device = await session.get(Device, device_id)
+    if device is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    assignment = await session.scalar(
+        select(Assignment).where(Assignment.device_id == device_id, Assignment.revoked_at.is_(None))
+    )
+    if assignment is None:
+        raise HTTPException(status_code=409, detail="device has no active assignment")
+
+    if payload.name is not None:
+        device.name = payload.name.strip()
+    if payload.kind is not None:
+        device.kind = payload.kind.strip() or device.kind
+    if payload.profile_id is not None:
+        profile = await _resolve_profile(session, payload.profile_id)
+        assignment.playlist_profile_id = profile.id
+
+    await session.flush()
+    return _device_out(device, assignment)
+
+
+@app.delete("/api/v1/devices/{device_id}", status_code=204, tags=["devices"])
+async def delete_device(device_id: str, session: SessionDep, _: AdminDep) -> Response:
+    device = await session.get(Device, device_id)
+    if device is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    await session.execute(delete(Assignment).where(Assignment.device_id == device_id))
+    await session.delete(device)
+    return Response(status_code=204)
 
 
 @app.get("/api/v1/devices", response_model=list[DeviceOut], tags=["devices"])
@@ -2043,6 +2087,7 @@ def _device_out(device: Device, assignment: Assignment) -> DeviceOut:
         id=device.id,
         name=device.name,
         kind=device.kind,
+        profile_id=assignment.playlist_profile_id,
         token_prefix=assignment.token_prefix,
         m3u_path="/p/<token>/live.m3u",
         created_at=device.created_at,

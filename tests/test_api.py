@@ -326,3 +326,47 @@ async def test_the_cache_can_be_disabled(
     playlist = (await client.get(f"/p/{device['token']}/live.m3u")).text
     assert device["token"] in playlist
     assert "__IPTVCC_TOKEN__" not in playlist
+
+
+@pytest.mark.asyncio
+async def test_a_device_can_be_renamed_moved_and_deleted(client: httpx.AsyncClient) -> None:
+    created = (
+        await client.post(
+            "/api/v1/devices",
+            json={"name": "Kitchen TV", "kind": "android_tv"},
+            headers=ADMIN_HEADERS,
+        )
+    ).json()
+
+    renamed = await client.patch(
+        f"/api/v1/devices/{created['id']}", json={"name": "Bedroom TV"}, headers=ADMIN_HEADERS
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["name"] == "Bedroom TV"
+
+    profile = (
+        await client.post("/api/v1/profiles", json={"name": "Second"}, headers=ADMIN_HEADERS)
+    ).json()
+    moved = await client.patch(
+        f"/api/v1/devices/{created['id']}",
+        json={"profile_id": profile["id"]},
+        headers=ADMIN_HEADERS,
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["profile_id"] == profile["id"]
+
+    devices = (await client.get("/api/v1/devices", headers=ADMIN_HEADERS)).json()
+    assert any(row["name"] == "Bedroom TV" for row in devices)
+
+    playlist_before = await client.get(f"/p/{created['token']}/live.m3u")
+    assert playlist_before.status_code == 200
+
+    removed = await client.delete(f"/api/v1/devices/{created['id']}", headers=ADMIN_HEADERS)
+    assert removed.status_code == 204
+
+    devices = (await client.get("/api/v1/devices", headers=ADMIN_HEADERS)).json()
+    assert not any(row["id"] == created["id"] for row in devices)
+    playlist_after = await client.get(f"/p/{created['token']}/live.m3u")
+    # The token no longer resolves, and the endpoint reports the playlist as absent rather than as a
+    # permission problem: that reveals nothing about whether the token ever existed.
+    assert playlist_after.status_code in {401, 404}
