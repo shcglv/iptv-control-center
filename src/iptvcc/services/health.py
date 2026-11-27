@@ -28,7 +28,7 @@ from ..config import get_settings
 from ..models import HealthCheck, Stream, StreamQuality
 from ..secrets import decrypt
 
-PROBE_TIMEOUT = 8.0
+PROBE_TIMEOUT = 5.0
 MAX_BYTES = 2048
 MAX_CONCURRENCY = 2
 PRUNE_SECONDS = 7 * 86_400

@@ -40,14 +40,16 @@ class Settings(BaseSettings):
     # Probe scheduler. Disable in tests and when probes must not run (e.g. provider slot limits).
     scheduler_enabled: bool = True
     scheduler_tick_seconds: int = 60
-    scheduler_batch_size: int = 25
+    # A 10 000-stream catalog needs roughly 2.8 probes per second to be covered hourly; the old
+    # default of 25 per minute never reached most channels. Raise these together with concurrency.
+    scheduler_batch_size: int = 100
     scheduler_lock_ttl_seconds: int = 180
     # Channels served in the last 24 h are "hot": checked often. Everything else: hourly.
     scheduler_hot_interval_seconds: int = 300
     scheduler_cold_interval_seconds: int = 3600
     # Probe depth: passive reads 2 KB over HTTP; active also runs ffprobe on the stream.
     probe_mode: str = "passive"
-    probe_concurrency: int = 2
+    probe_concurrency: int = 6
     # A single provider should not receive every concurrent probe in a batch.
     probe_host_concurrency: int = 2
     ffprobe_path: str = "ffprobe"

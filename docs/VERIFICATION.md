@@ -1,7 +1,7 @@
 # Verification report
 
 **Date:** 2026-11-26
-**Version:** 1.7.14 (tagged `v1.7.14`)
+**Version:** 1.7.15 (tagged `v1.7.15`)
 **Environment:** Windows development machine, Python 3.12.0, Docker 29.9.3, Chromium via Playwright
 **Database under test:** SQLite **and PostgreSQL 16** — the full suite passes on both
 

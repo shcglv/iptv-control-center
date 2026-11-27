@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.15] — 2026-11-27
+
+### Changed
+
+- **The scheduler now covers a 10 000-stream catalog.** At 25 probes per minute it needed nearly seven
+  hours for one pass, so most channels never received an uptime at all — the panel showed `0%` because
+  no probe had reached them, not because they were broken. The batch is now 100 per tick and probe
+  concurrency 6; the per-host cap of 2 is unchanged, so no single provider receives the whole batch.
+- Probe timeout 8 s → 5 s: three of the imported providers currently fail at connect time, and an 8 s
+  wait per dead stream was what made the queue crawl.
+
+### Notes
+
+- Uptime for the deployed catalog will still read `0%` for streams whose host answers `401` or refuses
+  the connection. That is a property of the providers, not of the panel; 1.7.14 now prints the reason
+  under the number.
 ## [1.7.14] — 2026-11-27
 
 ### Changed

@@ -1,6 +1,6 @@
 # Status against the specification
 
-**Version 1.7.14 · 1.7.13 · tagged `v1.7.14`**
+**Version 1.7.15 · 1.7.14 · tagged `v1.7.15`**
 
 What exists, what does not, and how each claim is verified. "Verified" means a test or a recorded
 run proves it; "implemented" means the code exists but no test or run has exercised it end to end.
