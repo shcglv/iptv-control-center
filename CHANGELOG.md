@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.11] — 2026-11-27
+
+First release deployed to the owner's Coolify server at `https://iptv.joxit.ru`.
+
+### Added
+
+- **`python -m iptvcc.cli reset-password --email … --password …`** replaces an admin password and
+  revokes every session it holds. The panel has no password form, so a deployment whose password was
+  set once by an operator could never rotate it. Two tests cover the change and the revocation.
+
+### Fixed
+
+- **The image could not write to `data/`.** `/app` and its subdirectories were created as root before
+  the switch to uid 10001, so the panel's own preflight reported
+  `data/artifacts: [Errno 13] Permission denied` on the deployed instance, and CI's acceptance job
+  failed for the same reason. The image now creates and owns `/app/data/artifacts` and
+  `/app/data/backups`.
+- `lxml-stubs` is declared in the dev extras; the local venv had it and CI did not, so the first CI
+  run in the project's history failed on mypy.
+- The container acceptance test starts the container with
+  `--add-host host.docker.internal:host-gateway`, which a Linux runner needs and Docker Desktop also
+  accepts.
 ## [1.7.10] — 2026-11-27
 
 ### Changed

@@ -183,3 +183,51 @@ async def test_login_reports_failure_when_the_session_cannot_be_saved(
         assert "session" in response.text
     finally:
         app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.mark.asyncio
+async def test_reset_password_changes_login_and_revokes_sessions(
+    client: httpx.AsyncClient, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """A deployment admin must be able to rotate a password; sessions do not survive it."""
+    from iptvcc.auth import reset_admin_password
+
+    first = await client.post(
+        "/api/v1/auth/login",
+        json={"email": TEST_ADMIN_EMAIL, "password": TEST_ADMIN_PASSWORD, "totp": _totp()},
+    )
+    assert first.status_code == 200
+
+    async with session_factory() as session:
+        assert await reset_admin_password(
+            session, email=TEST_ADMIN_EMAIL, password="new-password-2026"
+        )
+        await session.commit()
+
+    # The old session no longer authenticates the admin API.
+    stale = await client.get("/api/v1/profiles")
+    assert stale.status_code == 401
+
+    old = await client.post(
+        "/api/v1/auth/login",
+        json={"email": TEST_ADMIN_EMAIL, "password": TEST_ADMIN_PASSWORD, "totp": _totp()},
+    )
+    assert old.status_code == 401
+
+    new = await client.post(
+        "/api/v1/auth/login",
+        json={"email": TEST_ADMIN_EMAIL, "password": "new-password-2026", "totp": _totp()},
+    )
+    assert new.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_reset_password_reports_an_unknown_admin(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    from iptvcc.auth import reset_admin_password
+
+    async with session_factory() as session:
+        assert not await reset_admin_password(
+            session, email="ghost@example.test", password="long-enough-123"
+        )

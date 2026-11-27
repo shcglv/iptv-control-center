@@ -12,7 +12,7 @@ import time
 from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import passwords, totp
@@ -76,6 +76,20 @@ async def create_admin_user(
     session.add(user)
     await session.flush()
     return user, secret
+
+
+async def reset_admin_password(session: AsyncSession, *, email: str, password: str) -> bool:
+    """Replace an admin password and revoke every session it holds.
+
+    The panel has no password form, and a deployment whose admin password was set once by an
+    operator had no way to rotate it. Returns False when no admin has that email.
+    """
+    user = await session.scalar(select(AdminUser).where(AdminUser.email == email.strip().lower()))
+    if user is None:
+        return False
+    user.password_hash = passwords.hash_password(password)
+    await session.execute(delete(AdminSession).where(AdminSession.user_id == user.id))
+    return True
 
 
 async def authenticate(
