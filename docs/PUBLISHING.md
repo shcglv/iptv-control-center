@@ -80,6 +80,24 @@ the first push is also its first test. If a job fails, the log is the next debug
 - `src/iptvcc/static/` and `web/node_modules/` — built by CI and by the Dockerfile.
 - `.env` files — only `.env.example` is tracked.
 
+## What a tag means
+
+A tag marks a **release of the product**: a commit whose behaviour was accepted by the gate. Commits
+that only change tests, drills, documentation or the verification tooling may land after the tag
+without one, and that is deliberate — chasing `tag == HEAD` for a corrected test would produce an
+endless series of patch releases with nothing in them.
+
+The rule this repository follows:
+
+| Change | Tag |
+|---|---|
+| product behaviour (API, delivery, EPG, security, image) | yes, after the gate |
+| tests, drills, documentation, tooling | no; they are verification scaffolding |
+
+The handover bundle always carries `main`, so it includes the scaffolding; the tag inside it names the
+release you are running. `RELEASE.md` states which release that is, and `docs/VERIFICATION.md`
+records the gate result for it.
+
 ## Bumping the version
 
 Use the script, not a text replace:
