@@ -269,3 +269,60 @@ async def test_health_reports_503_when_the_database_is_unreachable(
         assert body["database"] == "error"
     finally:
         app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.mark.asyncio
+async def test_two_devices_share_one_render_but_keep_their_own_tokens(
+    client: httpx.AsyncClient,
+) -> None:
+    """The cache is keyed by profile, not by token, and substitutes the token per request."""
+    source = (
+        await client.post(
+            "/api/v1/sources",
+            json={"name": "M3U", "url": "http://p.test/l.m3u"},
+            headers=ADMIN_HEADERS,
+        )
+    ).json()
+    await client.post(
+        f"/api/v1/sources/{source['id']}/import", json={"m3u": SAMPLE_M3U}, headers=ADMIN_HEADERS
+    )
+    first = (
+        await client.post("/api/v1/devices", json={"name": "TV A"}, headers=ADMIN_HEADERS)
+    ).json()
+    second = (
+        await client.post("/api/v1/devices", json={"name": "TV B"}, headers=ADMIN_HEADERS)
+    ).json()
+
+    a = (await client.get(f"/p/{first['token']}/live.m3u")).text
+    b = (await client.get(f"/p/{second['token']}/live.m3u")).text
+
+    assert first["token"] in a
+    assert second["token"] in b
+    assert first["token"] not in b
+    # Same channels, same order: only the token differs.
+    assert a.replace(first["token"], "TOKEN") == b.replace(second["token"], "TOKEN")
+
+
+@pytest.mark.asyncio
+async def test_the_cache_can_be_disabled(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from iptvcc.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "playlist_cache_seconds", 0, raising=False)
+    source = (
+        await client.post(
+            "/api/v1/sources",
+            json={"name": "M3U", "url": "http://p.test/l.m3u"},
+            headers=ADMIN_HEADERS,
+        )
+    ).json()
+    await client.post(
+        f"/api/v1/sources/{source['id']}/import", json={"m3u": SAMPLE_M3U}, headers=ADMIN_HEADERS
+    )
+    device = (
+        await client.post("/api/v1/devices", json={"name": "TV"}, headers=ADMIN_HEADERS)
+    ).json()
+    playlist = (await client.get(f"/p/{device['token']}/live.m3u")).text
+    assert device["token"] in playlist
+    assert "__IPTVCC_TOKEN__" not in playlist

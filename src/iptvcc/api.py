@@ -69,7 +69,12 @@ from .services.catalog import (
     ingest_catalog,
     match_channels,
 )
-from .services.delivery import build_playlist, get_active_assignment, resolve_stream
+from .services.delivery import (
+    build_playlist,
+    clear_playlist_cache,
+    get_active_assignment,
+    resolve_stream,
+)
 from .services.discovery import ADAPTERS, store_items
 from .services.epg import (
     XmltvError,
@@ -160,6 +165,21 @@ class BodyLimitMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class PlaylistCacheInvalidationMiddleware(BaseHTTPMiddleware):
+    """Drop rendered playlists after any successful write, so an edit is visible immediately.
+
+    The cache is keyed by profile and lives for `IPTV_PLAYLIST_CACHE_SECONDS`; without this,
+    hiding a channel would appear to do nothing until the entry expired. Admin writes are rare, so
+    a blunt clear costs one render and removes a class of "I changed it and nothing happened".
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
+        response: Response = await call_next(request)
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and response.status_code < 400:
+            clear_playlist_cache()
+        return response
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Apply browser-hardening headers to every response.
 
@@ -197,6 +217,7 @@ configure_logging()
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(BodyLimitMiddleware)
+app.add_middleware(PlaylistCacheInvalidationMiddleware)
 
 
 # --- admin auth --------------------------------------------------------------------------------

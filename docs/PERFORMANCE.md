@@ -32,6 +32,29 @@ pessimistic baseline, not as production SLOs.
 At 3 000 channels / 72 000 programmes the same run gives: import 2.1 s, re-run 0.8 s, render 0.36 s,
 EPG ingest 13.8 s, guide 4.9 s.
 
+## The evening burst
+
+The realistic load is not a steady trickle: it is several televisions switching on for the same
+broadcast. Measured against the container on a 500-channel profile, thirty concurrent
+`/p/<token>/live.m3u` requests:
+
+| State | p50 | max |
+|---|---|---|
+| Before any caching | **12 085 ms** | 21 757 ms |
+| With a 30-second render cache | **4 193 ms** | 11 752 ms |
+| With cache **and** request coalescing | **516 ms** | 615 ms |
+
+Rendering is CPU-bound and serialises on the event loop, so thirty requests used to queue thirty
+renders. The cache alone did not help a cold burst, because every request missed it before the first
+finished; a per-key lock makes one request render while the rest wait and reuse the result.
+
+The same burst against the resolver (thirty `302`s) sits at **935 ms** p50 — that path does a
+database lookup per request and is unaffected by the playlist cache.
+
+What this costs: a playlist may be up to `IPTV_PLAYLIST_CACHE_SECONDS` (default 30) stale. That is
+bounded on purpose — any successful write through the API clears the cache, so an edit is visible on
+the next request rather than after the TTL.
+
 ## Memory, not only time
 
 The container has a fixed budget on the target server: 384 MB for the application. An import that

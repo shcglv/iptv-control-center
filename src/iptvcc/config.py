@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     # uploaded as JSON, and 50 MB of playlist is already far beyond a realistic provider export.
     max_request_bytes: int = 64 * 1024 * 1024
 
+    # A rendered playlist is cached per profile, device family and base URL for this long, so a
+    # household switching several televisions on at once renders once. 0 disables the cache.
+    playlist_cache_seconds: int = 30
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() in {"production", "prod"}

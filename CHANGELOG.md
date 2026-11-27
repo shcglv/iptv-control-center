@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.10] — 2026-11-27
+
+### Changed
+
+- **A burst of devices no longer queues a render each.** Thirty concurrent playlist fetches of a
+  500-channel profile took 12 085 ms at the median, because rendering is CPU-bound and serialises on
+  the event loop. A per-profile cache (token replaced by a placeholder, substituted per request) plus
+  per-key coalescing brings that to **516 ms** — a 23× improvement — and 30 concurrent resolver hits
+  stay at 935 ms.
+- `IPTV_PLAYLIST_CACHE_SECONDS` (default 30) bounds the staleness; **any successful write through the
+  API clears the cache**, so hiding a channel is visible on the next request rather than after the
+  TTL. Without that, an edit would appear to do nothing.
+
+### Notes
+
+- Found by measuring instead of guessing: the first burst run (12 s) looked like a bug in the
+  benchmark until the numbers were broken down per request.
 ## [1.7.9] — 2026-11-26
 
 ### Changed
