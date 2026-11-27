@@ -41,6 +41,7 @@ dev = [
   "playwright>=1.40",
   "bandit>=1.7",
   "pip-audit>=2.7",
+  "lxml-stubs>=0.5",
 ]
 
 [tool.setuptools.packages.find]
