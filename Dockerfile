@@ -68,6 +68,11 @@ COPY scripts ./scripts
 RUN pip install --no-cache-dir . \
  && rm -rf /app/src
 
+# The application writes guide cache files and backups under data/. Created as root by COPY/WORKDIR
+# otherwise, which made the panel's own preflight fail with "Permission denied: 'data'" in production.
+RUN mkdir -p /app/data/artifacts /app/data/backups \
+ && chown -R 10001:10001 /app/data
+
 USER 10001:10001
 
 EXPOSE 8000
