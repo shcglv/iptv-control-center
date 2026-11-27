@@ -38,6 +38,29 @@ inherited from the 1.6.6 run:
 | Container acceptance, image built from `v1.7.0` | **3 passed**, 39 s |
 | Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
 
+## The deployed instance, 2026-11-27
+
+The product is running at `https://iptv.joxit.ru` on the owner's Coolify server. What was actually
+observed, in the order it happened:
+
+| Check | Result |
+|---|---|
+| Coolify deployment of `1.7.11` from GitHub | finished, application `running:healthy` |
+| `/healthz` | `{"status":"ok","version":"1.7.11","database":"ok"}` |
+| Panel self-check (`/api/v1/system/check`) | **8/8 ok** — encryption key, base URL, timezone, telegram, rate limit, artifacts dir, database, migrations |
+| `scripts/smoke_public.py --base https://iptv.joxit.ru` | **SMOKE PASSED** (5 checks: healthz, login page, assets, security headers, TLS 89 days) |
+| Real provider playlist imported by URL | **4 097 streams parsed**, **3 420 channels** created and linked |
+| Device playlist | 784 KiB, 3 420 `#EXTINF` entries |
+| Resolver | `302` to the provider's HLS URL |
+| CI on GitHub | **green** for the first time — web, backend, PostgreSQL, audit, image build + acceptance |
+
+Two defects were found **only** because the artifact ran on a real server, and both are fixed in
+1.7.11: the image could not write to `data/` (root-owned before the `USER` switch, which made the
+panel's own preflight fail), and there was no way to rotate an admin password.
+
+Still not proven, and unchanged by this deployment: a real television playing a real channel. That is
+`docs/ACCEPTANCE.md`, and it needs the owner's devices.
+
 ## Re-acceptance at `839e78d` (1.7.10)
 
 The playlist cache and the write-invalidation middleware changed delivery and the API, so the gate ran

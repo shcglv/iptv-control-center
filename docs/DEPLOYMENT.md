@@ -1,7 +1,24 @@
 # Deployment plan — Coolify
 
-**Status: not executed.** Nothing has been created, changed or deleted on `176.123.161.28`. This is
-the plan that needs an explicit owner **GO**.
+**Status: executed on 2026-11-27** by the owner's explicit instruction.
+
+The plan below was carried out against `176.123.161.28` through the Coolify API (project
+`IPTV Control Center`, application `iptv-api`, database `iptv-db`), with the domain in Coolify and the
+DNS record set to DNS-only:
+
+| Item | Value |
+|---|---|
+| URL | `https://iptv.joxit.ru` (TLS, 89 days at deploy time) |
+| Application | Coolify application `piw2ntwkptugw2wmxwqse2yg`, Dockerfile, port 8000 |
+| Database | Coolify PostgreSQL 16 resource `slolozwonq1lgtimjbn8vqjl`, internal network only |
+| Migrations | `ec324056e4de`, applied by the entrypoint on start |
+| Health | `/healthz` → `{"status":"ok","version":"1.7.11","database":"ok"}` |
+| Panel preflight | 8/8 ok |
+| `smoke_public.py` | 5/5 ok |
+
+Two defects surfaced only at this step and were fixed in 1.7.11: the image could not write to
+`data/` (root-owned before the `USER` switch), and there was no way to rotate an admin password
+(`cli reset-password` now exists).
 
 ## Shape
 
