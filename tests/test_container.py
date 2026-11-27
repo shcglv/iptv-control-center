@@ -168,6 +168,10 @@ def container(image: None, tmp_path_factory: pytest.TempPathFactory) -> Iterator
         "-d",
         "--name",
         CONTAINER,
+        # Docker Desktop resolves host.docker.internal itself; on a Linux host (CI) it only exists
+        # with this flag, and without it the discovery step failed with "cannot resolve host".
+        "--add-host",
+        "host.docker.internal:host-gateway",
         "-p",
         f"{port}:8000",
         "-v",
