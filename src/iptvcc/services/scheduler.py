@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ..config import get_settings
 from ..models import Channel, ChannelStream, SchedulerState, Stream, StreamQuality
 from .health import run_probe_round
+from .source_refresh import refresh_due_sources
 
 logger = logging.getLogger(__name__)
 
@@ -196,12 +197,20 @@ class ProbeScheduler:
                     session, batch_size=self._batch, hot_seconds=self._hot, cold_seconds=self._cold
                 )
                 stats = await run_probe_round(session, stream_ids=ids)
+                # Sources drift from the provider the moment an import finishes; a few per tick keep
+                # the catalog current without a manual click.
+                refreshed = await refresh_due_sources(session, limit=2)
                 state.rounds = (state.rounds or 0) + 1
                 state.probed_total = (state.probed_total or 0) + int(stats["probed"])
                 state.last_round_epoch = now
                 state.last_error = None
                 await session.commit()
-                return {**stats, "skipped": False}
+                return {
+                    **stats,
+                    "refreshed": refreshed["refreshed"],
+                    "refresh_failed": refreshed["failed"],
+                    "skipped": False,
+                }
             except Exception as exc:
                 state.last_error = f"{type(exc).__name__}: {exc}"[:500]
                 await session.commit()

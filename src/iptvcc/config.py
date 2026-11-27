@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     # household switching several televisions on at once renders once. 0 disables the cache.
     playlist_cache_seconds: int = 30
 
+    # Re-import a source when its last attempt is older than this. 0 disables automatic refresh.
+    source_refresh_hours: int = 6
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() in {"production", "prod"}

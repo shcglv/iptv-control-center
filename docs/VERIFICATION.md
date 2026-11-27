@@ -1,7 +1,7 @@
 # Verification report
 
 **Date:** 2026-11-26
-**Version:** 1.7.12 (tagged `v1.7.12`)
+**Version:** 1.7.13 (tagged `v1.7.13`)
 **Environment:** Windows development machine, Python 3.12.0, Docker 29.9.3, Chromium via Playwright
 **Database under test:** SQLite **and PostgreSQL 16** — the full suite passes on both
 
@@ -69,7 +69,7 @@ again on that commit:
 
 | Check | Result |
 |---|---|
-| Backend, PostgreSQL 16 | **296 passed**, 16 skipped, 355 s |
+| Backend, PostgreSQL 16 | **298 passed**, 16 skipped, 355 s |
 | Container acceptance, image built from `839e78d` | **3 passed**, 50 s |
 | Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
 | Drill matrix (`verify_all.py --skip-network`) | **9 passed**, 2 skipped: docs, spec, scheduler, telegram, write-abort, panel, upgrade, restore, postgres-container |
@@ -112,8 +112,8 @@ the gate ran again on that commit:
 
 | Check | Result |
 |---|---|
-| Backend, SQLite | **296 passed**, 16 skipped, 222 s |
-| Backend, PostgreSQL 16 | **296 passed**, 16 skipped, 311 s |
+| Backend, SQLite | **298 passed**, 16 skipped, 222 s |
+| Backend, PostgreSQL 16 | **298 passed**, 16 skipped, 311 s |
 | Container acceptance, image built from `e424a3c` (exercises the wait loop) | **3 passed**, 47 s |
 | Panel check, production-shaped container | **8/8 ok**, `/docs`, `/redoc`, `/openapi.json` → 404 |
 | Write-abort drill on a real uvicorn server | **passed** — 200 with the default scope, 500 with `scope="function"` |
@@ -142,8 +142,8 @@ migrations on the live database) and fails by design in a bare checkout.
 
 | Area | Command | Result |
 |---|---|---|
-| Backend (SQLite) | `pytest -q` | **296 passed**, 16 skipped |
-| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **296 passed**, 16 skipped |
+| Backend (SQLite) | `pytest -q` | **298 passed**, 16 skipped |
+| Backend (PostgreSQL 16) | `IPTV_TEST_DATABASE_URL=postgresql+psycopg://… pytest -q` | **298 passed**, 16 skipped |
 | Backup (PostgreSQL) | `scripts/verify_pg_container.py` | **PASSED** — migrations at start (`ec324056e4de`), import, 302 resolver, restart persistence, 78 KB dump with 28 table entries |
 | Restore (PostgreSQL) | `scripts/verify_restore.py` | **PASSED** — dump restored into a fresh database, row counts match across 28 tables (12 rows), and the application served 2 channels from the restored copy |
 | Upgrade (PostgreSQL) | `scripts/verify_upgrade.py` | **PASSED** — schema at `198a8944b683`, data written through the real import path, upgraded to `head`, rows intact, device playlist still served |
@@ -191,7 +191,7 @@ rather than a possibly-stale object. Repeat-accept is a `404` (the suggestion is
 ## Backend suite
 
 ```
-296 passed, 16 skipped
+298 passed, 16 skipped
 ```
 
 Coverage by area: M3U parsing and idempotent import (plus a 17-case provider corpus), matching,

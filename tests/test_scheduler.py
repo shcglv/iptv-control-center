@@ -275,3 +275,66 @@ async def test_stopping_the_scheduler_releases_the_lease(
         assert await acquire_lease(session, second.owner, 180) is True
         await session.commit()
         await second.stop()
+
+
+@pytest.mark.asyncio
+async def test_due_sources_are_refreshed_without_a_click(
+    session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A playlist changes after import; the scheduler must pull it again when it is due."""
+    from datetime import UTC, datetime, timedelta
+
+    from iptvcc.config import get_settings
+    from iptvcc.services import source_refresh
+
+    playlist = '#EXTM3U\n#EXTINF:-1 tvg-id="x.test",Channel X\nhttp://p.test/x.ts\n'
+
+    async def _fetch(_url: str) -> str:
+        return playlist
+
+    monkeypatch.setattr(source_refresh, "fetch_text", _fetch)
+    monkeypatch.setattr(get_settings(), "source_refresh_hours", 6, raising=False)
+
+    async with session_factory() as session:
+        due = Source(
+            name="due",
+            url="http://p.test/a.m3u",
+            last_import_at=datetime.now(UTC) - timedelta(hours=7),
+        )
+        fresh = Source(name="fresh", url="http://p.test/b.m3u", last_import_at=datetime.now(UTC))
+        session.add_all([due, fresh])
+        await session.commit()
+
+        result = await source_refresh.refresh_due_sources(session, limit=5)
+        assert result == {"refreshed": 1, "failed": 0}
+        assert due.last_status == "success"
+        assert fresh.last_status is None
+
+
+@pytest.mark.asyncio
+async def test_a_failing_refresh_is_recorded_and_not_retried_every_tick(
+    session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from iptvcc.config import get_settings
+    from iptvcc.netguard import UnsafeUrlError
+    from iptvcc.services import source_refresh
+
+    async def _fetch(_url: str) -> str:
+        raise UnsafeUrlError("provider returned HTTP 403")
+
+    monkeypatch.setattr(source_refresh, "fetch_text", _fetch)
+    monkeypatch.setattr(get_settings(), "source_refresh_hours", 6, raising=False)
+
+    async with session_factory() as session:
+        source = Source(name="broken", url="http://p.test/bad.m3u")
+        session.add(source)
+        await session.commit()
+
+        result = await source_refresh.refresh_due_sources(session, limit=5)
+        assert result == {"refreshed": 0, "failed": 1}
+        assert source.last_status == "error"
+        assert source.last_error == "provider returned HTTP 403"
+
+        # The attempt timestamp moved, so the next tick does not hammer the same provider.
+        again = await source_refresh.refresh_due_sources(session, limit=5)
+        assert again == {"refreshed": 0, "failed": 0}

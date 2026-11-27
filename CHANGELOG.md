@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.13] — 2026-11-27
+
+### Added
+
+- **Sources refresh themselves.** Until now a playlist was imported only when an operator pressed the
+  button, so the catalog drifted from the provider the moment the import finished. The scheduler now
+  re-imports up to two due sources per tick; `IPTV_SOURCE_REFRESH_HOURS` (default 6, `0` disables)
+  decides what "due" means. A failed refresh is recorded on the source and its attempt time moves, so a
+  dead provider is not hammered every tick.
+
+### Notes
+
+- The forum the owner uses sits behind a Cloudflare challenge that no automated client on this network
+  clears — plain HTTP, RSS, a real Chrome driven by Playwright, a third-party reader and a copied
+  browser profile all fail. Automatic *discovery* there is not possible; automatic *refresh* of the
+  playlists it points to now is.
 ## [1.7.12] — 2026-11-27
 
 ### Fixed
