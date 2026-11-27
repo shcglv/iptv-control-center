@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.12] — 2026-11-27
+
+### Fixed
+
+- **A provider answering 403/404 produced HTTP 500.** `fetch_text` called `raise_for_status()`, and the
+  escaping `httpx.HTTPStatusError` was not caught by the import endpoint. Four sources in a real bulk
+  import of twenty-five failed this way. The fetcher now raises `UnsafeUrlError("provider returned
+  HTTP <code>")`, which the API already reports as a clean import error, and a test pins it.
 ## [1.7.11] — 2026-11-27
 
 First release deployed to the owner's Coolify server at `https://iptv.joxit.ru`.

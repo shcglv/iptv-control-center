@@ -147,7 +147,10 @@ async def fetch_text(
                 current = str(response.url.join(location))
                 await resolve_and_check(current)
                 continue
-            response.raise_for_status()
+            # A provider answering 403/404 is a clean import error. raise_for_status() used to
+            # escape as httpx.HTTPStatusError, which the API turned into HTTP 500.
+            if response.status_code >= 400:
+                raise UnsafeUrlError(f"provider returned HTTP {response.status_code}")
             content_length = response.headers.get("content-length")
             if content_length and int(content_length) > max_bytes:
                 raise UnsafeUrlError("document is too large")

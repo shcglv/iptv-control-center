@@ -83,3 +83,33 @@ async def test_metadata_address_stays_blocked_even_with_lan_targets_allowed(
 async def test_unresolvable_host_is_refused() -> None:
     with pytest.raises(UnsafeUrlError):
         await resolve_and_check("http://does-not-exist.invalid/list.m3u")
+
+
+@pytest.mark.asyncio
+async def test_provider_error_status_is_a_domain_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 403 from a provider must be a clean import error, not an unhandled server error.
+
+    Before this, fetch_text called raise_for_status(), the httpx.HTTPStatusError escaped the import
+    endpoint, and four sources in a real bulk import produced HTTP 500.
+    """
+    import httpx
+
+    from iptvcc import netguard
+
+    async def _allow(_url: str) -> None:
+        return None
+
+    monkeypatch.setattr(netguard, "resolve_and_check", _allow)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, text="denied")
+
+    real_client = httpx.AsyncClient
+
+    def patched(*args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(handler)
+        return real_client(*args, **kwargs)
+
+    monkeypatch.setattr(netguard.httpx, "AsyncClient", patched)
+    with pytest.raises(UnsafeUrlError, match="HTTP 403"):
+        await netguard.fetch_text("http://provider.test/list.m3u")
